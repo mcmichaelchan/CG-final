@@ -1,0 +1,5 @@
+Debug/
+.vs/
+.git/
+Libraries/Includes/GLFW/
+Libraries/Libs/glfw3.lib
