@@ -190,11 +190,11 @@ int main() {
 	// Load Textures
 	// Cubemap (Skybox)
 	vector<const GLchar*> faces;
-	faces.push_back("skybox/sahara/right.tga");
 	faces.push_back("skybox/sahara/left.tga");
+	faces.push_back("skybox/sahara/back.tga");
 	faces.push_back("skybox/sahara/top.tga");
 	faces.push_back("skybox/sahara/bottom.tga");
-	faces.push_back("skybox/sahara/back.tga");
+	faces.push_back("skybox/sahara/right.tga");
 	faces.push_back("skybox/sahara/front.tga");
 	GLuint cubemapTexture = TextureLoading::LoadCubemap(faces);
 
@@ -236,10 +236,12 @@ int main() {
 	//glEnable(GL_DEPTH_TEST);
 	// ---- render loop ----
 	while (!glfwWindowShouldClose(window)) {
+		glDepthFunc(GL_LESS); // Set depth function back to default
 		float currentFrame = glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
 		glm::mat4 model(1);
+		glm::mat4 skyboxModel(1);
 		glm::mat4 view(1);
 		glm::mat4 projection(1);
 
@@ -256,7 +258,9 @@ int main() {
 		glClear(GL_DEPTH_BUFFER_BIT);
 
 		shader.use();
-		model = glm::scale(model, glm::vec3(10.0f, 10.0f, 10.0f));
+		model = glm::rotate(model, 90.0f, glm::vec3(1.0, 0.0, 0.0));
+		model = glm::translate(model, glm::vec3(-2.5f, 0.8f, 0.5f));
+		model = glm::scale(model, glm::vec3(100.0f, 100.0f, 100.0f));
 		projection = glm::perspective(camera.Zoom, (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.01f, 100.0f);
 		view = camera.GetViewMatrix();
 		//projection = glm::perspective(180.0f, 1.0f, 0.01f, 100.0f);
@@ -275,10 +279,23 @@ int main() {
 		glBindVertexArray(VAO);
 		glDrawElements(GL_TRIANGLES, size * 10, GL_UNSIGNED_INT, 0);
 
-		// check out triggerations & render
 
-		//ImGui::Render();
-		//ImGui_ImplGlfwGL3_RenderDrawData(ImGui::GetDrawData());
+
+		// Draw skybox as last
+		//glDepthFunc(GL_LEQUAL);  // Change depth function so depth test passes when values are equal to depth buffer's content
+		skyboxShader.use();
+		skyboxModel = glm::scale(skyboxModel, glm::vec3(80.0f, 80.0f, 80.0f));
+		//view = glm::mat4(glm::mat3(camera.GetViewMatrix()));	// Remove any translation component of the view matrix
+		glUniformMatrix4fv(glGetUniformLocation(skyboxShader.ID, "view"), 1, GL_FALSE, glm::value_ptr(view));
+		glUniformMatrix4fv(glGetUniformLocation(skyboxShader.ID, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+		glUniformMatrix4fv(glGetUniformLocation(skyboxShader.ID, "model"), 1, GL_FALSE, glm::value_ptr(skyboxModel));
+
+		// skybox cube
+		glBindVertexArray(skyboxVAO);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+		glDrawArrays(GL_TRIANGLES, 0, 30);
+		glBindVertexArray(0);
+		//glDepthFunc(GL_LESS); // Set depth function back to default
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
