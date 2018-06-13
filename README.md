@@ -16,4 +16,4 @@ final
 - 在`Libraries/Includes`新建一个文件夹`GLFW`
 - 将`Libraries/Includes/GLFW$(VISUAL STUDIO VERSION)`里面的文件复制到`Libraries/Includes/GLFW`文件夹内。
 - 将`Libraries/Libs/GLFW$(VISUAL STUDIO VERSION)`里面的文件复制到`Libraries/Libs`文件夹内。
-
+- 下载`.vs`文件夹，并且放在项目的根目录下。
