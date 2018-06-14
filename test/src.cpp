@@ -22,7 +22,8 @@ using namespace std;
 
 #define WINDOW_WIDTH  1600  
 #define WINDOW_HEIGHT 800
-Camera camera(glm::vec3(0.0f, 1.5f, 8.0f));
+Camera camera(glm::vec3(50.0f, 1.5f, 50.0f));
+//Camera camera(glm::vec3(0.0f, 0.0f, 0.0f));
 bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
@@ -34,6 +35,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 vector<vector<int>> readMap(const char *path);
 vector<vector<int>> m_textures;
+
 int main() {
 	glfwInit();
 	// OpenGL version & mode setting
@@ -42,7 +44,7 @@ int main() {
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 	// Create a window & context/viewpoint setting
-	GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "My First OpenGL", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Final OpenGL Project", NULL, NULL);
 	if (window == NULL) {
 		cout << "Failed to create GLFW window" << endl;
 		glfwTerminate();
@@ -83,9 +85,8 @@ int main() {
 		vertices[i + 3] = 1.0f;
 		vertices[i + 4] = 1.0f;
 		vertices[i + 5] = 1.0f;
-		vertices[i + 6] = (float)j / (float)map[0].size();
-		vertices[i + 7] = (float)k / (float)map.size();
-		//cout << vertices[i] << "/" << vertices[i+1] << "/" << vertices[i+2] << "/" << vertices[i+3] << "/" << vertices[i+4] << "/" << vertices[i+5] << endl;
+		vertices[i + 6] = (float)j / (float)map[0].size() * 50;
+		vertices[i + 7] = (float)k / (float)map.size() * 50;
 		k++;
 		if (k >= map[0].size()) {
 			k = 0;
@@ -104,7 +105,6 @@ int main() {
 		triangleIndices[count + 3] = i + 1;
 		triangleIndices[count + 4] = i + map[0].size();
 		triangleIndices[count + 5] = i + map[0].size() + 1;
-		//cout << triangleIndices[count] << "/" << triangleIndices[count + 1] << "/" << triangleIndices[count + 2] << endl;
 		count += 6;
 	}
 
@@ -209,9 +209,9 @@ int main() {
 	float perspec[4] = { 20.0f, 1.0f, 0.1f, 100.0f };
 	float ortho[6] = { -2.0f, 2.0f, -2.0f, 2.0f, 1.0f, 100.0f };
 
-	//ÌùÍ¼²¿·Ö
+	//ÃŒÃ¹ÃÂ¼Â²Â¿Â·Ã–
 	int width, height, nrChannels;
-	unsigned char *data = SOIL_load_image("texture/sand_texture.jpg", &width, &height, &nrChannels, 0);
+	unsigned char *data = SOIL_load_image("texture/sand_texture3.jpg", &width, &height, &nrChannels, 0);
 
 	unsigned int texture;
 	glGenTextures(1, &texture);
@@ -233,13 +233,15 @@ int main() {
 	}
 	SOIL_free_image_data(data);
 
-	//glEnable(GL_DEPTH_TEST);
+	glEnable(GL_DEPTH_TEST);
 	// ---- render loop ----
 	while (!glfwWindowShouldClose(window)) {
+		glDepthFunc(GL_LESS); // Set depth function back to default
 		float currentFrame = glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
 		glm::mat4 model(1);
+		glm::mat4 skyboxModel(1);
 		glm::mat4 view(1);
 		glm::mat4 projection(1);
 
@@ -256,29 +258,40 @@ int main() {
 		glClear(GL_DEPTH_BUFFER_BIT);
 
 		shader.use();
-		model = glm::scale(model, glm::vec3(10.0f, 10.0f, 10.0f));
+    model = glm::scale(model, glm::vec3(100.0f, 100.0f, 100.0f));
+    model = glm::rotate(model, 90.0f, glm::vec3(1.0, 0.0, 0.0));
 		projection = glm::perspective(camera.Zoom, (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.01f, 100.0f);
 		view = camera.GetViewMatrix();
 		//projection = glm::perspective(180.0f, 1.0f, 0.01f, 100.0f);
 		shader.setVec3("viewPos", camera.Position.x, camera.Position.y, camera.Position.z);
-		int modelLoc = glGetUniformLocation(shader.ID, "model");
-		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-		int viewLoc = glGetUniformLocation(shader.ID, "view");
-		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-		int proLoc = glGetUniformLocation(shader.ID, "projection");
-		glUniformMatrix4fv(proLoc, 1, GL_FALSE, glm::value_ptr(projection));
-
-
+    shader.setMat4("model", model);
+    shader.setMat4("view", view);
+    shader.setMat4("projection", projection);
 
 		//glDrawArrays(GL_TRIANGLES, 0, );
 		glBindTexture(GL_TEXTURE_2D, texture);
 		glBindVertexArray(VAO);
 		glDrawElements(GL_TRIANGLES, size * 10, GL_UNSIGNED_INT, 0);
 
-		// check out triggerations & render
 
-		//ImGui::Render();
-		//ImGui_ImplGlfwGL3_RenderDrawData(ImGui::GetDrawData());
+
+		// Draw skybox as last
+		glDepthFunc(GL_LEQUAL);  // Change depth function so depth test passes when values are equal to depth buffer's content
+		skyboxShader.use();
+    skyboxModel = glm::translate(skyboxModel, glm::vec3(50.0f, 20.0f, 50.0f));
+    skyboxModel = glm::scale(skyboxModel, glm::vec3(50.0f, 50.0f, 50.0f));
+
+    //view = glm::mat4(glm::mat3(camera.GetViewMatrix()));	// Remove any translation component of the view matrix
+    skyboxShader.setMat4("model", skyboxModel);
+    skyboxShader.setMat4("view", view);
+    skyboxShader.setMat4("projection", projection);
+
+		// skybox cube
+		glBindVertexArray(skyboxVAO);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+		glDrawArrays(GL_TRIANGLES, 0, 30);
+		glBindVertexArray(0);
+		//glDepthFunc(GL_LESS); // Set depth function back to default
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
