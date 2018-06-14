@@ -190,12 +190,12 @@ int main() {
 	// Load Textures
 	// Cubemap (Skybox)
 	vector<const GLchar*> faces;
-	faces.push_back("skybox/sahara/right.tga");
-	faces.push_back("skybox/sahara/left.tga");
-	faces.push_back("skybox/sahara/top.tga");
-	faces.push_back("skybox/sahara/bottom.tga");
-	faces.push_back("skybox/sahara/back.tga");
-	faces.push_back("skybox/sahara/front.tga");
+	faces.push_back("skybox/pure/left.tga");
+	faces.push_back("skybox/pure/back.tga");
+	faces.push_back("skybox/pure/top.tga");
+	faces.push_back("skybox/pure/bottom.tga");
+	faces.push_back("skybox/pure/right.tga");
+	faces.push_back("skybox/pure/front.tga");
 	GLuint cubemapTexture = TextureLoading::LoadCubemap(faces);
 
 	glm::mat4 view;
