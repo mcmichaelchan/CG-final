@@ -22,8 +22,10 @@ using namespace std;
 
 #define WINDOW_WIDTH  1600  
 #define WINDOW_HEIGHT 800
+
+// global variables
 Camera camera(glm::vec3(50.0f, 1.5f, 50.0f));
-//Camera camera(glm::vec3(0.0f, 0.0f, 0.0f));
+vector<vector<int>> m_textures;
 bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
@@ -34,7 +36,53 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 vector<vector<int>> readMap(const char *path);
-vector<vector<int>> m_textures;
+void terrainVertexCalculation(float *vertices, unsigned int *triangleIndices, vector<vector<int>> map, int size);
+
+// skybox vertices
+const GLfloat skyboxVertices[] = {
+  // Positions
+  -1.0f,  1.0f, -1.0f,
+  -1.0f, -1.0f, -1.0f,
+  1.0f, -1.0f, -1.0f,
+  1.0f, -1.0f, -1.0f,
+  1.0f,  1.0f, -1.0f,
+  -1.0f,  1.0f, -1.0f,
+
+  -1.0f, -1.0f,  1.0f,
+  -1.0f, -1.0f, -1.0f,
+  -1.0f,  1.0f, -1.0f,
+  -1.0f,  1.0f, -1.0f,
+  -1.0f,  1.0f,  1.0f,
+  -1.0f, -1.0f,  1.0f,
+
+  1.0f, -1.0f, -1.0f,
+  1.0f, -1.0f,  1.0f,
+  1.0f,  1.0f,  1.0f,
+  1.0f,  1.0f,  1.0f,
+  1.0f,  1.0f, -1.0f,
+  1.0f, -1.0f, -1.0f,
+
+  -1.0f, -1.0f,  1.0f,
+  -1.0f,  1.0f,  1.0f,
+  1.0f,  1.0f,  1.0f,
+  1.0f,  1.0f,  1.0f,
+  1.0f, -1.0f,  1.0f,
+  -1.0f, -1.0f,  1.0f,
+
+  -1.0f,  1.0f, -1.0f,
+  1.0f,  1.0f, -1.0f,
+  1.0f,  1.0f,  1.0f,
+  1.0f,  1.0f,  1.0f,
+  -1.0f,  1.0f,  1.0f,
+  -1.0f,  1.0f, -1.0f,
+
+  -1.0f, -1.0f, -1.0f,
+  -1.0f, -1.0f,  1.0f,
+  1.0f, -1.0f, -1.0f,
+  1.0f, -1.0f, -1.0f,
+  -1.0f, -1.0f,  1.0f,
+  1.0f, -1.0f,  1.0f
+};
 
 int main() {
 	glfwInit();
@@ -50,6 +98,8 @@ int main() {
 		glfwTerminate();
 		return -1;
 	}
+
+  // Callback functions
 	glfwMakeContextCurrent(window);
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	glfwSetCursorPosCallback(window, mouse_callback);
@@ -75,84 +125,12 @@ int main() {
 	Shader shader("shader/vShaderSrc.txt", "shader/fShaderSrc.txt");
 	Shader skyboxShader("shader/skyboxVs.txt", "shader/skyboxFrag.txt");
 
-	vector<vector<int>> map = readMap("texture/map3.bmp");
-	int size = map.size() * map[0].size();
-	float *vertices = new float[size * 8];
-	for (int i = 0, j = 0, k = 0; i < size * 8; i += 8) {
-		vertices[i] = (float)j / (float)map[0].size();
-		vertices[i + 1] = (float)k / (float)map.size();
-		vertices[i + 2] = (float)map[j][k] / 256.0f / 8;
-		vertices[i + 3] = 1.0f;
-		vertices[i + 4] = 1.0f;
-		vertices[i + 5] = 1.0f;
-		vertices[i + 6] = (float)j / (float)map[0].size() * 50;
-		vertices[i + 7] = (float)k / (float)map.size() * 50;
-		k++;
-		if (k >= map[0].size()) {
-			k = 0;
-			j++;
-		}
-	}
-	unsigned int *triangleIndices = new unsigned int[size * 6];
-	int count = 0;
-	for (int i = 0; i < size - map[0].size(); i++) {
-		if (i % map[0].size() == map[0].size() - 1) {
-			continue;
-		}
-		triangleIndices[count] = i;
-		triangleIndices[count + 1] = i + 1;
-		triangleIndices[count + 2] = i + map[0].size();
-		triangleIndices[count + 3] = i + 1;
-		triangleIndices[count + 4] = i + map[0].size();
-		triangleIndices[count + 5] = i + map[0].size() + 1;
-		count += 6;
-	}
-
-	// skybox vertices
-	GLfloat skyboxVertices[] = {
-		// Positions
-		-1.0f,  1.0f, -1.0f,
-		-1.0f, -1.0f, -1.0f,
-		1.0f, -1.0f, -1.0f,
-		1.0f, -1.0f, -1.0f,
-		1.0f,  1.0f, -1.0f,
-		-1.0f,  1.0f, -1.0f,
-
-		-1.0f, -1.0f,  1.0f,
-		-1.0f, -1.0f, -1.0f,
-		-1.0f,  1.0f, -1.0f,
-		-1.0f,  1.0f, -1.0f,
-		-1.0f,  1.0f,  1.0f,
-		-1.0f, -1.0f,  1.0f,
-
-		1.0f, -1.0f, -1.0f,
-		1.0f, -1.0f,  1.0f,
-		1.0f,  1.0f,  1.0f,
-		1.0f,  1.0f,  1.0f,
-		1.0f,  1.0f, -1.0f,
-		1.0f, -1.0f, -1.0f,
-
-		-1.0f, -1.0f,  1.0f,
-		-1.0f,  1.0f,  1.0f,
-		1.0f,  1.0f,  1.0f,
-		1.0f,  1.0f,  1.0f,
-		1.0f, -1.0f,  1.0f,
-		-1.0f, -1.0f,  1.0f,
-
-		-1.0f,  1.0f, -1.0f,
-		1.0f,  1.0f, -1.0f,
-		1.0f,  1.0f,  1.0f,
-		1.0f,  1.0f,  1.0f,
-		-1.0f,  1.0f,  1.0f,
-		-1.0f,  1.0f, -1.0f,
-
-		-1.0f, -1.0f, -1.0f,
-		-1.0f, -1.0f,  1.0f,
-		1.0f, -1.0f, -1.0f,
-		1.0f, -1.0f, -1.0f,
-		-1.0f, -1.0f,  1.0f,
-		1.0f, -1.0f,  1.0f
-	};
+  // read map from files and calculate terrain data
+  vector<vector<int>> map = readMap("texture/map3.bmp");
+  int size = map.size() * map[0].size();
+  float *vertices = new float[size * 8];
+  unsigned int *triangleIndices = new unsigned int[size * 6];
+  terrainVertexCalculation(vertices, triangleIndices, map, size);	
 
 	unsigned int VAO, VBO, EBO;
 	glGenVertexArrays(1, &VAO);
@@ -198,18 +176,8 @@ int main() {
 	faces.push_back("skybox/pure/front.tga");
 	GLuint cubemapTexture = TextureLoading::LoadCubemap(faces);
 
-	glm::mat4 view;
-	bool depth = true;
-	int taskMark = 1;
-	int mark2 = 0;
-	float temp = 0.0f;
-	float save = 0.0f;
-	int sign = 0;
-	float trans[3] = { -1.5f, 0.5f, -1.5f };
-	float perspec[4] = { 20.0f, 1.0f, 0.1f, 100.0f };
-	float ortho[6] = { -2.0f, 2.0f, -2.0f, 2.0f, 1.0f, 100.0f };
 
-	//ÌùÍ¼²¿·Ö
+	// load terrain texture
 	int width, height, nrChannels;
 	unsigned char *data = SOIL_load_image("texture/sand_texture3.jpg", &width, &height, &nrChannels, 0);
 
@@ -233,30 +201,32 @@ int main() {
 	}
 	SOIL_free_image_data(data);
 
+  // depth test
 	glEnable(GL_DEPTH_TEST);
+
 	// ---- render loop ----
 	while (!glfwWindowShouldClose(window)) {
 		glDepthFunc(GL_LESS); // Set depth function back to default
 		float currentFrame = glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
+
 		glm::mat4 model(1);
 		glm::mat4 skyboxModel(1);
 		glm::mat4 view(1);
 		glm::mat4 projection(1);
 
-		// process input from keyboard/mouse/other
+		// Process input from keyboard/mouse/other
 		processInput(window);
 
 		// init ImGui
 		//ImGui_ImplGlfwGL3_NewFrame();
 
-
-
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 		glClear(GL_DEPTH_BUFFER_BIT);
 
+    // Draw terrain.
 		shader.use();
     model = glm::scale(model, glm::vec3(100.0f, 100.0f, 100.0f));
     model = glm::rotate(model, 90.0f, glm::vec3(1.0, 0.0, 0.0));
@@ -275,10 +245,10 @@ int main() {
 
 
 
-		// Draw skybox as last
+		// Draw skybox at last
 		glDepthFunc(GL_LEQUAL);  // Change depth function so depth test passes when values are equal to depth buffer's content
 		skyboxShader.use();
-    skyboxModel = glm::translate(skyboxModel, glm::vec3(50.0f, 20.0f, 50.0f));
+    skyboxModel = glm::translate(skyboxModel, glm::vec3(50.0f, -5.0f, 50.0f));
     skyboxModel = glm::scale(skyboxModel, glm::vec3(50.0f, 50.0f, 50.0f));
 
     //view = glm::mat4(glm::mat3(camera.GetViewMatrix()));	// Remove any translation component of the view matrix
@@ -352,4 +322,35 @@ vector<vector<int>> readMap(const char *path) {
 		}
 	}
 	return map;
+}
+
+void terrainVertexCalculation(float *vertices,unsigned int *triangleIndices, vector<vector<int>> map, int size) {
+  for (int i = 0, j = 0, k = 0; i < size * 8; i += 8) {
+    vertices[i] = (float)j / (float)map[0].size();
+    vertices[i + 1] = (float)k / (float)map.size();
+    vertices[i + 2] = (float)map[j][k] / 256.0f / 8;
+    vertices[i + 3] = 1.0f;
+    vertices[i + 4] = 1.0f;
+    vertices[i + 5] = 1.0f;
+    vertices[i + 6] = (float)j / (float)map[0].size() * 50;
+    vertices[i + 7] = (float)k / (float)map.size() * 50;
+    k++;
+    if (k >= map[0].size()) {
+      k = 0;
+      j++;
+    }
+  }
+  int count = 0;
+  for (int i = 0; i < size - map[0].size(); i++) {
+    if (i % map[0].size() == map[0].size() - 1) {
+      continue;
+    }
+    triangleIndices[count] = i;
+    triangleIndices[count + 1] = i + 1;
+    triangleIndices[count + 2] = i + map[0].size();
+    triangleIndices[count + 3] = i + 1;
+    triangleIndices[count + 4] = i + map[0].size();
+    triangleIndices[count + 5] = i + map[0].size() + 1;
+    count += 6;
+  }
 }
