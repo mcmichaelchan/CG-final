@@ -152,9 +152,13 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="shader\fShaderSrc.txt" />
+    <Text Include="shader\fShaderSrc_shadow.txt" />
+    <Text Include="shader\fShaderSrc_simple.txt" />
     <Text Include="shader\skyboxFrag.txt" />
     <Text Include="shader\skyboxVs.txt" />
     <Text Include="shader\vShaderSrc.txt" />
+    <Text Include="shader\vShaderSrc_shadow.txt" />
+    <Text Include="shader\vShaderSrc_simple.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -6,13 +6,14 @@ in vec4 posInLSpace;
 out vec4 FragColor;
 
 
-uniform sampler2D ourTexture;
+uniform sampler2D terrainTexture;
+uniform sampler2D depthMap;
 
 uniform vec3 lightPos;
 uniform vec3 viewPos;
 uniform vec3 lightColor;
 
-uniform sampler2D depthMap;
+
 
 float ShadowCalculation(vec4 posInLSpace, float bias)
 {
@@ -42,7 +43,7 @@ float ShadowCalculation(vec4 posInLSpace, float bias)
 }
 void main()
 {	
-	vec4 objectColor = vec4(texture(ourTexture, TexCoord).rgb, 1.0f);
+	vec4 objectColor = vec4(texture(terrainTexture, TexCoord).rgb, 1.0f);
 	vec3 ambient = 0.5 * lightColor ;
 	vec3 norm = normalize(Normal);
 	vec3 lightDir = normalize(FragPos - lightPos);

@@ -58,5 +58,17 @@
     <Text Include="shader\skyboxVs.txt">
       <Filter>资源文件</Filter>
     </Text>
+    <Text Include="shader\fShaderSrc_shadow.txt">
+      <Filter>资源文件</Filter>
+    </Text>
+    <Text Include="shader\fShaderSrc_simple.txt">
+      <Filter>资源文件</Filter>
+    </Text>
+    <Text Include="shader\vShaderSrc_shadow.txt">
+      <Filter>资源文件</Filter>
+    </Text>
+    <Text Include="shader\vShaderSrc_simple.txt">
+      <Filter>资源文件</Filter>
+    </Text>
   </ItemGroup>
 </Project>
