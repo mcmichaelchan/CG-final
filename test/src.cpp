@@ -25,7 +25,8 @@ using namespace std;
 
 // global variables
 Camera camera(glm::vec3(50.0f, 1.5f, 50.0f));
-//Camera camera(glm::vec3(0.0f, 0.0f, 0.0f));
+//Camera camera(glm::vec3(49.0f, 39.0f, -48.0f)); // LIGHTPOS
+//Camera camera(glm::vec3(0.0f, 0.0f, 0.0f)); // origin
 vector<vector<int>> m_textures;
 bool firstMouse = true;
 float deltaTime = 0.0f;
@@ -51,12 +52,13 @@ unsigned int VAO, VBO, EBO;
 GLuint skyboxVAO, skyboxVBO;
 
 //光源位置
-glm::vec3 lightPos = glm::vec3{ 49.5662460f, 11.85620787f, 0.717168331f };
+glm::vec3 lightPos = glm::vec3(49.0f, 39.0f, -48.0f);
 //深度贴图帧缓冲
 GLuint depthMapFBO;
 //2D纹理
 GLuint depthMap;
 GLuint terrainTexture;
+GLuint normalMap;
 
 //2D纹理大小
 const GLuint SHADOW_WIDTH = 4096, SHADOW_HEIGHT = 4096;
@@ -157,7 +159,7 @@ int main() {
   // read map from files and calculate terrain data
   vector<vector<int>> map = readMap("texture/map3.bmp");
   mapsize = map.size() * map[0].size();
-  float *vertices = new float[mapsize * 8];
+  float *vertices = new float[mapsize * 10];
   unsigned int *triangleIndices = new unsigned int[mapsize * 6];
   terrainVertexCalculation(vertices, triangleIndices, map, mapsize);
 
@@ -167,18 +169,22 @@ int main() {
 	glBindVertexArray(VAO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	//glBufferStorage(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float)*mapsize * 8, vertices, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float)*mapsize * 10, vertices, GL_STATIC_DRAW);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int)*(mapsize * 6), triangleIndices, GL_STATIC_DRAW);
 	// position
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
 	//color
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (void*)(3 * sizeof(float)));
 	glEnableVertexAttribArray(1);
 	//texture
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (void*)(6 * sizeof(float)));
 	glEnableVertexAttribArray(2);
+  // normal map
+  glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (void*)(8 * sizeof(float)));
+  glEnableVertexAttribArray(3);
+
   glBindVertexArray(0);
 
 	// Setup skybox VAO
@@ -205,6 +211,8 @@ int main() {
 
 	// load terrain texture
   terrainTexture = TextureLoading::LoadTexture((GLchar*)"texture/sand_texture3.jpg");
+  // load normal map texture
+  normalMap = TextureLoading::LoadTexture((GLchar*)"texture/sand_normal.jpg");
 
 	//---depthmap
 	glGenFramebuffers(1, &depthMapFBO);
@@ -228,6 +236,7 @@ int main() {
 	shader_shadow.use();
 	shader_shadow.setInt("terrainTexture", 0);
 	shader_shadow.setInt("depthMap", 1);
+  shader_shadow.setInt("normalMap", 2);
 
   // depth test
 	glEnable(GL_DEPTH_TEST);
@@ -238,7 +247,6 @@ int main() {
 		float currentFrame = glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
-
 		// Process input from keyboard/mouse/other
 		processInput(window);
 
@@ -287,6 +295,8 @@ int main() {
 	// release sources
 	//ImGui_ImplGlfwGL3_Shutdown();
 	//ImGui::DestroyContext();
+  delete vertices;
+  delete triangleIndices;
 	glfwTerminate();
 	return 0;
 }
@@ -326,7 +336,6 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
 	camera.ProcessMouseScroll(yoffset);
 }
 
-
 vector<vector<int>> readMap(const char *path) {
 	cimg_library::CImg<unsigned char> img(path);
 	//img.display();
@@ -347,10 +356,10 @@ glm::vec3 crossProduct(glm::vec3 a, glm::vec3 b) {
 }
 
 void terrainVertexCalculation(float *vertices,unsigned int *triangleIndices, vector<vector<int>> map, int size) {
-  for (int i = 0, j = 0, k = 0; i < size * 8; i += 8) {
+  for (int i = 0, j = 0, k = 0; i < size * 10; i += 10) {
     vertices[i] = (float)j / (float)map[0].size();
     vertices[i + 1] = (float)k / (float)map.size();
-    vertices[i + 2] = (float)map[j][k] / 256.0f / 8;
+    vertices[i + 2] = (float)map[j][k] / 256.0f / 10;
 
 	//法向量
 	glm::vec3 v0 = glm::vec3{ (float)j / (float)map[0].size(), (float)k / (float)map.size(), (float)map[j][k] / 256.0f / 8 };
@@ -418,6 +427,8 @@ void terrainVertexCalculation(float *vertices,unsigned int *triangleIndices, vec
 
     vertices[i + 6] = (float)j / (float)map[0].size() * 50;
     vertices[i + 7] = (float)k / (float)map.size() * 50;
+    vertices[i + 8] = (float)j / (float)map[0].size() * 100;
+    vertices[i + 9] = (float)k / (float)map.size() * 100;
     k++;
     if (k >= map[0].size()) {
       k = 0;
@@ -454,12 +465,19 @@ void DepthMap(Shader shader1, Shader shader2) {
 	model = glm::rotate(model, 90.0f, glm::vec3(1.0, 0.0, 0.0));
 
 	GLfloat near_plane =1.0f, far_plane = 100.0f;
-	glm::mat4 lightProjection = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, near_plane, far_plane);
-	glm::mat4 lightView = glm::lookAt(
-		lightPos, // 
-		glm::vec3(0.0f, 0.0f, 0.0f), // and looks at the origin
-		glm::vec3(0.0f, 1.0f, 0.0f) // Head is up (set to 0,-1,0 to look upside-down)		
-	);
+	//glm::mat4 lightProjection = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, near_plane, far_plane);
+	//glm::mat4 lightView = glm::lookAt(
+	//	lightPos, // 
+	//	glm::vec3(0.0f, 0.0f, 0.0f), // and looks at the origin
+	//	glm::vec3(0.0f, 1.0f, 0.0f) // Head is up (set to 0,-1,0 to look upside-down)		
+	//);
+
+  glm::mat4 lightProjection = glm::perspective(45.0f, (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.01f, 100.0f);
+  glm::mat4 lightView = glm::lookAt(
+    glm::vec3(49.0f, 39.0f, -48.0f),
+    glm::vec3(49.0f, 39.0f, -48.0f) + glm::vec3(0.0f, -0.4f, 0.9f),
+    glm::vec3(0.0f, 1.0f, 0.4f)
+  );
 
 	lightSpaceMatrix = lightProjection * lightView;
 	
@@ -490,8 +508,12 @@ void DepthMap(Shader shader1, Shader shader2) {
   glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, terrainTexture);
 	
-	glActiveTexture(GL_TEXTURE1);
+  glActiveTexture(GL_TEXTURE2);
+  glBindTexture(GL_TEXTURE_2D, normalMap);
+
+  glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, depthMap);
+
 
 	renderScene(shader2);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
