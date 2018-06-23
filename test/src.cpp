@@ -38,7 +38,8 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 vector<vector<int>> readMap(const char *path);
-void terrainVertexCalculation(float *vertices, unsigned int *triangleIndices, vector<vector<int>> map, int size);
+void terrainVertexCalculation(float *vertices, vector<vector<int>> map, int size);
+void addVertice(float *vertices, int offset, glm::vec3 pos, glm::vec3 nm, glm::vec2 txt, glm::vec2 nmmap);
 glm::vec3 crossProduct(glm::vec3 a, glm::vec3 b);
 glm::mat4 lightSpaceMatrix;
 
@@ -65,6 +66,7 @@ const GLuint SHADOW_WIDTH = 4096, SHADOW_HEIGHT = 4096;
 
 //地图大小
 int mapsize;
+int itemNums = 10;
 
 glm::mat4 model;
 glm::mat4 skyboxModel;
@@ -158,27 +160,25 @@ int main() {
 
   // read map from files and calculate terrain data
   vector<vector<int>> map = readMap("texture/map3.bmp");
-  mapsize = map.size() * map[0].size();
-  float *vertices = new float[mapsize * 10];
-  unsigned int *triangleIndices = new unsigned int[mapsize * 6];
-  terrainVertexCalculation(vertices, triangleIndices, map, mapsize);
+  mapsize = (map.size() - 1) * (map[0].size() - 1);
+  float *vertices = new float[mapsize * 6 * itemNums];
+  
+  terrainVertexCalculation(vertices, map, mapsize);
 
 	glGenVertexArrays(1, &VAO);
 	glGenBuffers(1, &VBO);
-	glGenBuffers(1, &EBO);
 	glBindVertexArray(VAO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	//glBufferStorage(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float)*mapsize * 10, vertices, GL_STATIC_DRAW);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int)*(mapsize * 6), triangleIndices, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float)*mapsize * 6 * itemNums, vertices, GL_STATIC_DRAW);
+
 	// position
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
-	//color
+	// normal
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (void*)(3 * sizeof(float)));
 	glEnableVertexAttribArray(1);
-	//texture
+	// texture
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (void*)(6 * sizeof(float)));
 	glEnableVertexAttribArray(2);
   // normal map
@@ -299,7 +299,6 @@ int main() {
 	//ImGui_ImplGlfwGL3_Shutdown();
 	//ImGui::DestroyContext();
   delete vertices;
-  delete triangleIndices;
 	glfwTerminate();
 	return 0;
 }
@@ -358,99 +357,44 @@ glm::vec3 crossProduct(glm::vec3 a, glm::vec3 b) {
 	return glm::vec3{ (float)(a.y*b.z) - (float)(b.y*a.z), (float)(b.x*a.z) - (float)(a.x*b.z), (float)(a.x*b.y) - (float)(b.x*a.y) };
 }
 
-void terrainVertexCalculation(float *vertices,unsigned int *triangleIndices, vector<vector<int>> map, int size) {
-  for (int i = 0, j = 0, k = 0; i < size * 10; i += 10) {
-    vertices[i] = (float)j / (float)map[0].size();
-    vertices[i + 1] = (float)k / (float)map.size();
-    vertices[i + 2] = (float)map[j][k] / 256.0f / 10;
-
-	//法向量
-	glm::vec3 v0 = glm::vec3{ (float)j / (float)map[0].size(), (float)k / (float)map.size(), (float)map[j][k] / 256.0f / 8 };
-	glm::vec3 v1;
-	glm::vec3 v2;
-	glm::vec3 v3;
-	glm::vec3 v4;
-	glm::vec3 a;
-	glm::vec3 b;
-	
-	//v0v1v2
-	glm::vec3 n1 = glm::vec3{ 0.0f,0.0f,0.0f };
-	if (k - 1 < 0 || j - 1 < 0) {
-		n1 = glm::vec3{ 0.0f,0.0f,0.0f };
-	}
-	else {
-		v1 = glm::vec3{ (float)j / (float)map[0].size(), (float)(k - 1) / (float)map.size(), (float)map[j][k - 1] / 256.0f / 8 };
-		v2 = glm::vec3{ (float)(j - 1) / (float)map[0].size(), (float)k / (float)map.size(), (float)map[j - 1][k] / 256.0f / 8 };
-		a = v1 - v0;
-		b = v2 - v0;
-		n1 = crossProduct(a, b);
-	}
-
-	//v0v2v3
-	glm::vec3 n2 = glm::vec3{ 0.0f,0.0f,0.0f };
-	if (k + 1 > (map.size() - 1) || j - 1 < 0) {
-		n2 = glm::vec3{ 0.0f,0.0f,0.0f };
-	}
-	else {
-		v3 = glm::vec3{ (float)j / (float)map[0].size(), (float)(k + 1) / (float)map.size(), (float)map[j][k + 1] / 256.0f / 8 };
-		a = v2 - v0;
-		b = v3 - v0;
-		n2 = crossProduct(a, b);
-	}
-
-	//v0v3v4
-	glm::vec3 n3 = glm::vec3{ 0.0f,0.0f,0.0f };
-	if (k + 1 > (map.size() - 1) || j + 1 > (map[0].size() - 1)) {
-		n3 = glm::vec3{ 0.0f,0.0f,0.0f };
-	}
-	else {
-		v4 = glm::vec3{ (float)(j + 1) / (float)map[0].size(), (float)k / (float)map.size(), (float)map[j + 1][k] / 256.0f / 8 };
-		a = v3 - v0;
-		b = v4 - v0;
-		n3 = crossProduct(a, b);
-	}
-
-	//v0v4v1
-	glm::vec3 n4 = glm::vec3{ 0.0f,0.0f,0.0f };
-	if (k - 1 < 0 || j + 1 > (map[0].size() - 1)) {
-		n4 = glm::vec3{ 0.0f,0.0f,0.0f };
-	}
-	else {
-		a = v4 - v0;
-		b = v1 - v0;
-		n4 = crossProduct(a, b);
-	}
-
-	//相加归一
-	glm::vec3 Nor = n1 + n2 + n3 + n4;
-
-    vertices[i + 3] = Nor.x;
-    vertices[i + 4] = Nor.y;
-    vertices[i + 5] = Nor.z;
-
-    vertices[i + 6] = (float)j / (float)map[0].size() * 50;
-    vertices[i + 7] = (float)k / (float)map.size() * 50;
-    vertices[i + 8] = (float)j / (float)map[0].size() * 100;
-    vertices[i + 9] = (float)k / (float)map.size() * 100;
+void terrainVertexCalculation(float *vertices, vector<vector<int>> map, int size) {
+  int scaleSize = 10;
+  int i = 0, j = 0, k = 0;
+  for (; i < size * 6 * itemNums - map[0].size() * 6 * itemNums; i += 6 * itemNums) {
+    // vertex 1
+    glm::vec3 vtx1pos = glm::vec3((float)j / (float)map[0].size(), (float)k / (float)map.size(), (float)map[j][k] / 256.0f / scaleSize);
+    glm::vec3 vtx1nm = glm::vec3(1);
+    glm::vec2 vtx1txt = glm::vec2((float)j / (float)map[0].size() * 50, (float)k / (float)map.size() * 50);
+    glm::vec2 vtx1nmmap = glm::vec2((float)j / (float)map[0].size() * 100, (float)k / (float)map.size() * 100);
+    // vertex 2
+    glm::vec3 vtx2pos = glm::vec3((float)j / (float)map[0].size(), (float)(k + 1) / (float)map.size(), (float)map[j][k + 1] / 256.0f / scaleSize);
+    glm::vec3 vtx2nm = glm::vec3(1);
+    glm::vec2 vtx2txt = glm::vec2((float)j / (float)map[0].size() * 50, (float)(k + 1) / (float)map.size() * 50);
+    glm::vec2 vtx2nmmap = glm::vec2((float)j / (float)map[0].size() * 100, (float)(k + 1) / (float)map.size() * 100);
+    // vertex 3
+    glm::vec3 vtx3pos = glm::vec3((float)(j + 1) / (float)map[0].size(), (float)k / (float)map.size(), (float)map[j + 1][k] / 256.0f / scaleSize);
+    glm::vec3 vtx3nm = glm::vec3(1);
+    glm::vec2 vtx3txt = glm::vec2((float)(j + 1) / (float)map[0].size() * 50, (float)k / (float)map.size() * 50);
+    glm::vec2 vtx3nmmap = glm::vec2((float)(j + 1) / (float)map[0].size() * 100, (float)k / (float)map.size() * 100);
+    // vertex 4
+    glm::vec3 vtx4pos = glm::vec3((float)(j + 1) / (float)map[0].size(), (float)(k + 1) / (float)map.size(), (float)map[j + 1][k + 1] / 256.0f / scaleSize);
+    glm::vec3 vtx4nm = glm::vec3(1);
+    glm::vec2 vtx4txt = glm::vec2((float)(j + 1) / (float)map[0].size() * 50, (float)(k + 1) / (float)map.size() * 50);
+    glm::vec2 vtx4nmmap = glm::vec2((float)(j + 1) / (float)map[0].size() * 100, (float)(k + 1) / (float)map.size() * 100);
+    // add into array
+    addVertice(vertices, i, vtx1pos, vtx1nm, vtx1txt, vtx1nmmap);
+    addVertice(vertices, i + 1 * itemNums, vtx2pos, vtx2nm, vtx2txt, vtx2nmmap);
+    addVertice(vertices, i + 2 * itemNums, vtx3pos, vtx3nm, vtx3txt, vtx3nmmap);
+    addVertice(vertices, i + 3 * itemNums, vtx2pos, vtx2nm, vtx2txt, vtx2nmmap);
+    addVertice(vertices, i + 4 * itemNums, vtx3pos, vtx3nm, vtx3txt, vtx3nmmap);
+    addVertice(vertices, i + 5 * itemNums, vtx4pos, vtx4nm, vtx4txt, vtx4nmmap);
     k++;
-    if (k >= map[0].size()) {
+    if (k >= (map[0].size() - 2)) {
       k = 0;
       j++;
     }
   }
-  int count = 0;
-  for (int i = 0; i < size - map[0].size(); i++) {
-    if (i % map[0].size() == map[0].size() - 1) {
-      continue;
-    }
-    triangleIndices[count] = i;
-    triangleIndices[count + 1] = i + 1;
-    triangleIndices[count + 2] = i + map[0].size();
-    triangleIndices[count + 3] = i + 1;
-    triangleIndices[count + 4] = i + map[0].size();
-    triangleIndices[count + 5] = i + map[0].size() + 1;
-    count += 6;
-  }
+  cout << j << endl;
 }
 
 void renderScene(Shader shader) {
@@ -458,7 +402,7 @@ void renderScene(Shader shader) {
 	shader.setMat4("model", model);
 	glBindVertexArray(VAO);
   //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	glDrawElements(GL_TRIANGLES, mapsize * 10, GL_UNSIGNED_INT, 0);
+  glDrawArrays(GL_TRIANGLES, 0, mapsize * 6);
   //glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glBindVertexArray(0);
 }
@@ -525,3 +469,83 @@ void DepthMap(Shader shader1, Shader shader2) {
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   
 }
+
+void addVertice(float *vertices, int offset, glm::vec3 pos, glm::vec3 nm, glm::vec2 txt, glm::vec2 nmmap) {
+  vertices[offset] = pos.x;
+  vertices[offset + 1] = pos.y;
+  vertices[offset + 2] = pos.z;
+  vertices[offset + 3] = nm.x;
+  vertices[offset + 4] = nm.y;
+  vertices[offset + 5] = nm.z;
+  vertices[offset + 6] = txt.x;
+  vertices[offset + 7] = txt.y;
+  vertices[offset + 8] = nmmap.x;
+  vertices[offset + 9] = nmmap.y;
+}
+
+/*
+// calculate 法向量
+glm::vec3 v0 = glm::vec3{ (float)j / (float)map[0].size(), (float)k / (float)map.size(), (float)map[j][k] / 256.0f / 8 };
+glm::vec3 v1;
+glm::vec3 v2;
+glm::vec3 v3;
+glm::vec3 v4;
+glm::vec3 a;
+glm::vec3 b;
+
+//v0v1v2
+glm::vec3 n1 = glm::vec3{ 0.0f,0.0f,0.0f };
+if (k - 1 < 0 || j - 1 < 0) {
+n1 = glm::vec3{ 0.0f,0.0f,0.0f };
+}
+else {
+v1 = glm::vec3{ (float)j / (float)map[0].size(), (float)(k - 1) / (float)map.size(), (float)map[j][k - 1] / 256.0f / 8 };
+v2 = glm::vec3{ (float)(j - 1) / (float)map[0].size(), (float)k / (float)map.size(), (float)map[j - 1][k] / 256.0f / 8 };
+a = v1 - v0;
+b = v2 - v0;
+n1 = crossProduct(a, b);
+}
+
+//v0v2v3
+glm::vec3 n2 = glm::vec3{ 0.0f,0.0f,0.0f };
+if (k + 1 > (map.size() - 1) || j - 1 < 0) {
+n2 = glm::vec3{ 0.0f,0.0f,0.0f };
+}
+else {
+v3 = glm::vec3{ (float)j / (float)map[0].size(), (float)(k + 1) / (float)map.size(), (float)map[j][k + 1] / 256.0f / 8 };
+a = v2 - v0;
+b = v3 - v0;
+n2 = crossProduct(a, b);
+}
+
+//v0v3v4
+glm::vec3 n3 = glm::vec3{ 0.0f,0.0f,0.0f };
+if (k + 1 > (map.size() - 1) || j + 1 > (map[0].size() - 1)) {
+n3 = glm::vec3{ 0.0f,0.0f,0.0f };
+}
+else {
+v4 = glm::vec3{ (float)(j + 1) / (float)map[0].size(), (float)k / (float)map.size(), (float)map[j + 1][k] / 256.0f / 8 };
+a = v3 - v0;
+b = v4 - v0;
+n3 = crossProduct(a, b);
+}
+
+//v0v4v1
+glm::vec3 n4 = glm::vec3{ 0.0f,0.0f,0.0f };
+if (k - 1 < 0 || j + 1 > (map[0].size() - 1)) {
+n4 = glm::vec3{ 0.0f,0.0f,0.0f };
+}
+else {
+a = v4 - v0;
+b = v1 - v0;
+n4 = crossProduct(a, b);
+}
+
+//相加归一
+glm::vec3 Nor = n1 + n2 + n3 + n4;
+
+vertices[i + 3] = Nor.x;
+vertices[i + 4] = Nor.y;
+vertices[i + 5] = Nor.z;
+
+*/
