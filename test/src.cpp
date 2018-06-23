@@ -24,7 +24,7 @@ using namespace std;
 #define WINDOW_HEIGHT 800
 
 // global variables
-Camera camera(glm::vec3(50.0f, 1.5f, 50.0f));
+Camera camera(glm::vec3(0.0f, 0.0f, 0.0f));
 //Camera camera(glm::vec3(49.0f, 39.0f, -48.0f)); // LIGHTPOS
 //Camera camera(glm::vec3(0.0f, 0.0f, 0.0f)); // origin
 vector<vector<int>> m_textures;
@@ -253,6 +253,8 @@ int main() {
 		// init ImGui
 		//ImGui_ImplGlfwGL3_NewFrame();
 
+    lightPos = camera.Position;
+
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 		glClear(GL_DEPTH_BUFFER_BIT);
@@ -271,7 +273,8 @@ int main() {
 		// Draw skybox at last
 		glDepthFunc(GL_LEQUAL);  // Change depth function so depth test passes when values are equal to depth buffer's content
 		skyboxShader.use();
-		skyboxModel = glm::translate(skyboxModel, glm::vec3(50.0f, -5.0f, 50.0f));
+    skyboxModel = glm::rotate(skyboxModel, 90.0f, glm::vec3(1.0f, 0.0f, 0.0f));
+		skyboxModel = glm::translate(skyboxModel, glm::vec3(50.0f, 0.0f, -50.0f));
 		skyboxModel = glm::scale(skyboxModel, glm::vec3(50.0f, 50.0f, 50.0f));
 
 		//view = glm::mat4(glm::mat3(camera.GetViewMatrix()));	// Remove any translation component of the view matrix
@@ -462,7 +465,7 @@ void renderScene(Shader shader) {
 
 void DepthMap(Shader shader1, Shader shader2) {
 	model = glm::scale(model, glm::vec3(100.0f, 100.0f, 100.0f));
-	model = glm::rotate(model, 90.0f, glm::vec3(1.0, 0.0, 0.0));
+	//model = glm::rotate(model, 90.0f, glm::vec3(1.0, 0.0, 0.0));
 
 	GLfloat near_plane =1.0f, far_plane = 100.0f;
 	//glm::mat4 lightProjection = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, near_plane, far_plane);
@@ -472,12 +475,15 @@ void DepthMap(Shader shader1, Shader shader2) {
 	//	glm::vec3(0.0f, 1.0f, 0.0f) // Head is up (set to 0,-1,0 to look upside-down)		
 	//);
 
-  glm::mat4 lightProjection = glm::perspective(45.0f, (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.01f, 100.0f);
-  glm::mat4 lightView = glm::lookAt(
-    glm::vec3(49.0f, 39.0f, -48.0f),
-    glm::vec3(49.0f, 39.0f, -48.0f) + glm::vec3(0.0f, -0.4f, 0.9f),
-    glm::vec3(0.0f, 1.0f, 0.4f)
-  );
+  //glm::mat4 lightProjection = glm::perspective(45.0f, (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.01f, 100.0f);
+  //glm::mat4 lightView = glm::lookAt(
+  //  glm::vec3(49.0f, 39.0f, -48.0f),
+  //  glm::vec3(49.0f, 39.0f, -48.0f) + glm::vec3(0.0f, -0.4f, 0.9f),
+  //  glm::vec3(0.0f, 1.0f, 0.4f)
+  //);
+
+  glm::mat4 lightProjection = glm::perspective(camera.Zoom, (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.01f, 100.0f);
+  glm::mat4 lightView = camera.GetViewMatrix();
 
 	lightSpaceMatrix = lightProjection * lightView;
 	
