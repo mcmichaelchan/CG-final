@@ -152,11 +152,15 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="shader\fShaderSrc.txt" />
+    <Text Include="shader\fShaderSrc_border.txt" />
+    <Text Include="shader\fShaderSrc_cube.txt" />
     <Text Include="shader\fShaderSrc_shadow.txt" />
     <Text Include="shader\fShaderSrc_simple.txt" />
     <Text Include="shader\skyboxFrag.txt" />
     <Text Include="shader\skyboxVs.txt" />
     <Text Include="shader\vShaderSrc.txt" />
+    <Text Include="shader\vShaderSrc_border.txt" />
+    <Text Include="shader\vShaderSrc_cube.txt" />
     <Text Include="shader\vShaderSrc_shadow.txt" />
     <Text Include="shader\vShaderSrc_simple.txt" />
   </ItemGroup>
