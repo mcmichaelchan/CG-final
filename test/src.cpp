@@ -39,7 +39,8 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 vector<vector<int>> readMap(const char *path);
 void terrainVertexCalculation(float *vertices, vector<vector<int>> map, int size);
-void addVertice(float *vertices, int offset, glm::vec3 pos, glm::vec3 nm, glm::vec2 txt, glm::vec2 nmmap);
+void addVertice(float *vertices, int offset, glm::vec3 pos, glm::vec3 nm, glm::vec2 txt, glm::vec2 nmmap, glm::vec3 tan, glm::vec3 bitan);
+void TBNcalculation(glm::vec3 edge1, glm::vec3 edge2, glm::vec2 deltaUV1, glm::vec2 deltaUV2, glm::vec3 &tan, glm::vec3 &bitan);
 glm::vec3 crossProduct(glm::vec3 a, glm::vec3 b);
 glm::mat4 lightSpaceMatrix;
 
@@ -66,7 +67,7 @@ const GLuint SHADOW_WIDTH = 4096, SHADOW_HEIGHT = 4096;
 
 //µÿÕº¥Û–°
 int mapsize;
-int itemNums = 10;
+int itemNums = 16;
 
 glm::mat4 model;
 glm::mat4 skyboxModel;
@@ -150,13 +151,9 @@ int main() {
 	}
 
 	// Setup and compile our shaders
-	Shader shader("shader/vShaderSrc.txt", "shader/fShaderSrc.txt");
 	Shader skyboxShader("shader/skyboxVs.txt", "shader/skyboxFrag.txt");
-
 	Shader shader_simple("shader/vShaderSrc_simple.txt", "shader/fShaderSrc_simple.txt");
-	Shader shader_noe("shader/vShaderSrc_noe.txt", "shader/fShaderSrc_noe.txt");
 	Shader shader_shadow("shader/vShaderSrc_shadow.txt", "shader/fShaderSrc_shadow.txt");
-	Shader shader_light("shader/vShaderSrc_light.txt", "shader/fShaderSrc_light.txt");
 
   // read map from files and calculate terrain data
   vector<vector<int>> map = readMap("texture/map3.bmp");
@@ -173,17 +170,24 @@ int main() {
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float)*mapsize * 6 * itemNums, vertices, GL_STATIC_DRAW);
 
 	// position
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (void*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, itemNums * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
 	// normal
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (void*)(3 * sizeof(float)));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, itemNums * sizeof(float), (void*)(3 * sizeof(float)));
 	glEnableVertexAttribArray(1);
 	// texture
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (void*)(6 * sizeof(float)));
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, itemNums * sizeof(float), (void*)(6 * sizeof(float)));
 	glEnableVertexAttribArray(2);
   // normal map
-  glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 10 * sizeof(float), (void*)(8 * sizeof(float)));
+  glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, itemNums * sizeof(float), (void*)(8 * sizeof(float)));
   glEnableVertexAttribArray(3);
+  // tan
+  glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, itemNums * sizeof(float), (void*)(10 * sizeof(float)));
+  glEnableVertexAttribArray(4);
+  // bitan
+  glVertexAttribPointer(5, 3, GL_FLOAT, GL_FALSE, itemNums * sizeof(float), (void*)(13 * sizeof(float)));
+  glEnableVertexAttribArray(5);
+
 
   glBindVertexArray(0);
 
@@ -363,31 +367,45 @@ void terrainVertexCalculation(float *vertices, vector<vector<int>> map, int size
   for (; i < size * 6 * itemNums - map[0].size() * 6 * itemNums; i += 6 * itemNums) {
     // vertex 1
     glm::vec3 vtx1pos = glm::vec3((float)j / (float)map[0].size(), (float)k / (float)map.size(), (float)map[j][k] / 256.0f / scaleSize);
-    glm::vec3 vtx1nm = glm::vec3(1);
     glm::vec2 vtx1txt = glm::vec2((float)j / (float)map[0].size() * 50, (float)k / (float)map.size() * 50);
     glm::vec2 vtx1nmmap = glm::vec2((float)j / (float)map[0].size() * 100, (float)k / (float)map.size() * 100);
     // vertex 2
     glm::vec3 vtx2pos = glm::vec3((float)j / (float)map[0].size(), (float)(k + 1) / (float)map.size(), (float)map[j][k + 1] / 256.0f / scaleSize);
-    glm::vec3 vtx2nm = glm::vec3(1);
     glm::vec2 vtx2txt = glm::vec2((float)j / (float)map[0].size() * 50, (float)(k + 1) / (float)map.size() * 50);
     glm::vec2 vtx2nmmap = glm::vec2((float)j / (float)map[0].size() * 100, (float)(k + 1) / (float)map.size() * 100);
     // vertex 3
     glm::vec3 vtx3pos = glm::vec3((float)(j + 1) / (float)map[0].size(), (float)k / (float)map.size(), (float)map[j + 1][k] / 256.0f / scaleSize);
-    glm::vec3 vtx3nm = glm::vec3(1);
     glm::vec2 vtx3txt = glm::vec2((float)(j + 1) / (float)map[0].size() * 50, (float)k / (float)map.size() * 50);
     glm::vec2 vtx3nmmap = glm::vec2((float)(j + 1) / (float)map[0].size() * 100, (float)k / (float)map.size() * 100);
     // vertex 4
     glm::vec3 vtx4pos = glm::vec3((float)(j + 1) / (float)map[0].size(), (float)(k + 1) / (float)map.size(), (float)map[j + 1][k + 1] / 256.0f / scaleSize);
-    glm::vec3 vtx4nm = glm::vec3(1);
     glm::vec2 vtx4txt = glm::vec2((float)(j + 1) / (float)map[0].size() * 50, (float)(k + 1) / (float)map.size() * 50);
     glm::vec2 vtx4nmmap = glm::vec2((float)(j + 1) / (float)map[0].size() * 100, (float)(k + 1) / (float)map.size() * 100);
+    // triangle 1
+    glm::vec3 tr1edge1 = vtx2pos - vtx1pos;
+    glm::vec3 tr1edge2 = vtx3pos - vtx1pos;
+    glm::vec2 tr1deltaUV1 = vtx2nmmap - vtx1nmmap;
+    glm::vec2 tr1deltaUV2 = vtx3nmmap - vtx1nmmap;
+    glm::vec3 tr1nm = crossProduct(tr1edge1, tr1edge2);
+    glm::vec3 tr1tan(1);
+    glm::vec3 tr1bitan(1);
+    TBNcalculation(tr1edge1, tr1edge2, tr1deltaUV1, tr1deltaUV2, tr1tan, tr1bitan);
+    // triangle 2
+    glm::vec3 tr2edge1 = vtx2pos - vtx4pos;
+    glm::vec3 tr2edge2 = vtx3pos - vtx4pos;
+    glm::vec2 tr2deltaUV1 = vtx2nmmap - vtx4nmmap;
+    glm::vec2 tr2deltaUV2 = vtx3nmmap - vtx4nmmap;
+    glm::vec3 tr2nm = crossProduct(tr2edge1, tr2edge2);
+    glm::vec3 tr2tan(1);
+    glm::vec3 tr2bitan(1);
+    TBNcalculation(tr2edge1, tr2edge2, tr2deltaUV1, tr2deltaUV2, tr2tan, tr2bitan);
     // add into array
-    addVertice(vertices, i, vtx1pos, vtx1nm, vtx1txt, vtx1nmmap);
-    addVertice(vertices, i + 1 * itemNums, vtx2pos, vtx2nm, vtx2txt, vtx2nmmap);
-    addVertice(vertices, i + 2 * itemNums, vtx3pos, vtx3nm, vtx3txt, vtx3nmmap);
-    addVertice(vertices, i + 3 * itemNums, vtx2pos, vtx2nm, vtx2txt, vtx2nmmap);
-    addVertice(vertices, i + 4 * itemNums, vtx3pos, vtx3nm, vtx3txt, vtx3nmmap);
-    addVertice(vertices, i + 5 * itemNums, vtx4pos, vtx4nm, vtx4txt, vtx4nmmap);
+    addVertice(vertices, i, vtx1pos, tr1nm, vtx1txt, vtx1nmmap, tr1tan, tr1bitan);
+    addVertice(vertices, i + 1 * itemNums, vtx2pos, tr1nm, vtx2txt, vtx2nmmap, tr1tan, tr1bitan);
+    addVertice(vertices, i + 2 * itemNums, vtx3pos, tr1nm, vtx3txt, vtx3nmmap, tr1tan, tr1bitan);
+    addVertice(vertices, i + 3 * itemNums, vtx2pos, tr2nm, vtx2txt, vtx2nmmap, tr2tan, tr2bitan);
+    addVertice(vertices, i + 4 * itemNums, vtx3pos, tr2nm, vtx3txt, vtx3nmmap, tr2tan, tr2bitan);
+    addVertice(vertices, i + 5 * itemNums, vtx4pos, tr2nm, vtx4txt, vtx4nmmap, tr2tan, tr2bitan);
     k++;
     if (k >= (map[0].size() - 2)) {
       k = 0;
@@ -395,6 +413,20 @@ void terrainVertexCalculation(float *vertices, vector<vector<int>> map, int size
     }
   }
   cout << j << endl;
+}
+
+void TBNcalculation(glm::vec3 edge1, glm::vec3 edge2, glm::vec2 deltaUV1, glm::vec2 deltaUV2, glm::vec3 &tan, glm::vec3 &bitan) {
+  GLfloat f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+  tan.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+  tan.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+  tan.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+  tan = glm::normalize(tan);
+
+  bitan.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
+  bitan.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
+  bitan.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+  bitan = glm::normalize(bitan);
 }
 
 void renderScene(Shader shader) {
@@ -470,7 +502,7 @@ void DepthMap(Shader shader1, Shader shader2) {
   
 }
 
-void addVertice(float *vertices, int offset, glm::vec3 pos, glm::vec3 nm, glm::vec2 txt, glm::vec2 nmmap) {
+void addVertice(float *vertices, int offset, glm::vec3 pos, glm::vec3 nm, glm::vec2 txt, glm::vec2 nmmap, glm::vec3 tan, glm::vec3 bitan) {
   vertices[offset] = pos.x;
   vertices[offset + 1] = pos.y;
   vertices[offset + 2] = pos.z;
@@ -481,6 +513,12 @@ void addVertice(float *vertices, int offset, glm::vec3 pos, glm::vec3 nm, glm::v
   vertices[offset + 7] = txt.y;
   vertices[offset + 8] = nmmap.x;
   vertices[offset + 9] = nmmap.y;
+  vertices[offset + 10] = tan.x;
+  vertices[offset + 11] = tan.y;
+  vertices[offset + 12] = tan.z;
+  vertices[offset + 13] = bitan.x;
+  vertices[offset + 14] = bitan.y;
+  vertices[offset + 15] = bitan.z;
 }
 
 /*
