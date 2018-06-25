@@ -44,6 +44,15 @@
     <ClInclude Include="..\Libraries\Includes\imgui\imgui.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="particals.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="model.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="mesh.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="shader\fShaderSrc.txt">
@@ -68,6 +77,24 @@
       <Filter>资源文件</Filter>
     </Text>
     <Text Include="shader\vShaderSrc_simple.txt">
+      <Filter>资源文件</Filter>
+    </Text>
+    <Text Include="shader\fShaderSrc_cube.txt">
+      <Filter>资源文件</Filter>
+    </Text>
+    <Text Include="shader\vShaderSrc_cube.txt">
+      <Filter>资源文件</Filter>
+    </Text>
+    <Text Include="shader\fShaderSrc_border.txt">
+      <Filter>资源文件</Filter>
+    </Text>
+    <Text Include="shader\vShaderSrc_border.txt">
+      <Filter>资源文件</Filter>
+    </Text>
+    <Text Include="shader\fShaderSrcParticals.txt">
+      <Filter>资源文件</Filter>
+    </Text>
+    <Text Include="shader\vShaderSrcParticals.txt">
       <Filter>资源文件</Filter>
     </Text>
   </ItemGroup>

@@ -93,7 +93,7 @@
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>soil2-debug.lib;opengl32.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>soil2-debug.lib;opengl32.lib;glfw3.lib;assimp-vc140-mt.lib;freetype.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -149,14 +149,23 @@
   <ItemGroup>
     <ClInclude Include="..\Libraries\Includes\imgui\imgui.h" />
     <ClInclude Include="..\Libraries\Includes\imgui\imgui_impl_glfw_gl3.h" />
+    <ClInclude Include="mesh.h" />
+    <ClInclude Include="model.h" />
+    <ClInclude Include="particals.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="shader\fShaderSrc.txt" />
+    <Text Include="shader\fShaderSrcParticals.txt" />
+    <Text Include="shader\fShaderSrc_border.txt" />
+    <Text Include="shader\fShaderSrc_cube.txt" />
     <Text Include="shader\fShaderSrc_shadow.txt" />
     <Text Include="shader\fShaderSrc_simple.txt" />
     <Text Include="shader\skyboxFrag.txt" />
     <Text Include="shader\skyboxVs.txt" />
     <Text Include="shader\vShaderSrc.txt" />
+    <Text Include="shader\vShaderSrcParticals.txt" />
+    <Text Include="shader\vShaderSrc_border.txt" />
+    <Text Include="shader\vShaderSrc_cube.txt" />
     <Text Include="shader\vShaderSrc_shadow.txt" />
     <Text Include="shader\vShaderSrc_simple.txt" />
   </ItemGroup>
