@@ -1,4 +1,5 @@
 #include <iostream>
+#include <string>
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -14,9 +15,17 @@
 
 #include <cimg/CImg.h>
 
+#include "particals.h"
+#include "model.h"
+
 #include <SOIL2\SOIL2.h>
 
+#include <assert.h>
+
 #include <texture/Texture.h>
+#include <map>
+#include <ft2build.h>
+#include FT_FREETYPE_H
 
 using namespace std;
 
@@ -40,6 +49,7 @@ void processInput(GLFWwindow* window);
 vector<vector<int>> readMap(const char *path);
 void terrainVertexCalculation(float *vertices, vector<vector<int>> map, int size);
 void addVertice(float *vertices, int offset, glm::vec3 pos, glm::vec3 nm, glm::vec2 txt, glm::vec2 nmmap);
+void RenderText(Shader &shader, string text, GLfloat x, GLfloat y, GLfloat scale, glm::vec3 color);
 glm::vec3 crossProduct(glm::vec3 a, glm::vec3 b);
 glm::mat4 lightSpaceMatrix;
 
@@ -168,7 +178,14 @@ const GLfloat skyboxVertices[] = {
   1.0f, -1.0f,  1.0f
 };
 
-
+struct Character {
+	GLuint TextureID;
+	glm::ivec2 Size;
+	glm::ivec2 Bearing;
+	GLuint Advance;
+};
+map<GLchar, Character> Characters;
+GLuint TextVAO, TextVBO;
 
 int main() {
 	glfwInit();
@@ -198,10 +215,104 @@ int main() {
 		return -1;
 	}
 
+	// Set OpenGL options
+	//glEnable(GL_CULL_FACE);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	// configure global opengl state
+	// -----------------------------
+	//glEnable(GL_DEPTH_TEST);
+
+	Shader textShader("shader/text.vs", "shader/text.fs");
+	glm::mat4 Projection = glm::ortho(0.0f, static_cast<GLfloat>(WINDOW_WIDTH), 0.0f, static_cast<GLfloat>(WINDOW_HEIGHT));
+	textShader.use();
+	textShader.setMat4("projection", Projection);
+
+	// FreeType
+	FT_Library ft;
+	// All functions return a value different than 0 whenever an error occurred
+	if (FT_Init_FreeType(&ft))
+		cout << "ERROR::FREETYPE: Could not init FreeType Library" << endl;
+
+	// Load font as face
+	FT_Face face;
+	if (FT_New_Face(ft, "fonts/arial.ttf", 0, &face))
+		cout << "ERROR::FREETYPE: Failed to load font" << endl;
+
+	// Set size to load glyphs as
+	FT_Set_Pixel_Sizes(face, 0, 48);
+
+	// Disable byte-alignment restriction
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+	// Load first 128 characters of ASCII set
+	for (GLubyte c = 0; c < 128; c++)
+	{
+		// Load character glyph 
+		if (FT_Load_Char(face, c, FT_LOAD_RENDER))
+		{
+			cout << "ERROR::FREETYTPE: Failed to load Glyph" << endl;
+			continue;
+		}
+		// Generate texture
+		GLuint texture;
+		glGenTextures(1, &texture);
+		glBindTexture(GL_TEXTURE_2D, texture);
+		glTexImage2D(
+			GL_TEXTURE_2D,
+			0,
+			GL_RED,
+			face->glyph->bitmap.width,
+			face->glyph->bitmap.rows,
+			0,
+			GL_RED,
+			GL_UNSIGNED_BYTE,
+			face->glyph->bitmap.buffer
+		);
+		// Set texture options
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		// Now store character for later use
+		Character character = {
+			texture,
+			glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
+			glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
+			face->glyph->advance.x
+		};
+		Characters.insert(pair<GLchar, Character>(c, character));
+	}
+	glBindTexture(GL_TEXTURE_2D, 0);
+	// Destroy FreeType once we're finished
+	FT_Done_Face(face);
+	FT_Done_FreeType(ft);
+
+
+	// Configure VAO/VBO for texture quads
+	glGenVertexArrays(1, &TextVAO);
+	glGenBuffers(1, &TextVBO);
+	glBindVertexArray(TextVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, TextVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), 0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+
+	// build and compile shaders
+	// -------------------------
+	Shader ourShader("shader/model_loading.vs", "shader/model_loading.fs");
+
+	// load models
+	// -----------
+	Model ourModel("objects/Palm_01/Palm_01.obj");
+
 	// Setup and compile our shaders
 	Shader shader("shader/vShaderSrc.txt", "shader/fShaderSrc.txt");
 	Shader skyboxShader("shader/skyboxVs.txt", "shader/skyboxFrag.txt");
-
+	Shader particalsShader("shader/vShaderSrcParticals.txt", "shader/fShaderSrcParticals.txt");
 	Shader shader_simple("shader/vShaderSrc_simple.txt", "shader/fShaderSrc_simple.txt");
 	Shader shader_noe("shader/vShaderSrc_noe.txt", "shader/fShaderSrc_noe.txt");
 	Shader shader_shadow("shader/vShaderSrc_shadow.txt", "shader/fShaderSrc_shadow.txt");
@@ -264,6 +375,18 @@ int main() {
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid *)0);
 	glBindVertexArray(0);
 
+	// Setup particalsVAO
+	unsigned int particlesVBO, pariclesVAO;
+	glGenVertexArrays(1, &pariclesVAO);
+	glGenBuffers(1, &particlesVBO);
+	glBindVertexArray(pariclesVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, particlesVBO);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
+
+
 
 	// Load Textures
 	// Cubemap (Skybox)
@@ -320,6 +443,27 @@ int main() {
 	glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
 	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
 
+	// particals init
+	particals_operator test;
+
+	vector<float> randoms, deviations_x, deviations_y;
+	for (int i = 0; i < 50; i++) {
+		if (rand() % 20 < 10) {
+			deviations_x.push_back(-(rand() % 30));
+		}
+		else {
+			deviations_x.push_back(rand() % 30);
+		}
+	}
+	for (int i = 0; i < 50; i++) {
+		if (rand() % 20 < 10) {
+			deviations_y.push_back(-(rand() % 30));
+		}
+		else {
+			deviations_y.push_back(rand() % 30);
+		}
+	}
+
 	// ---- render loop ----
 	while (!glfwWindowShouldClose(window)) {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
@@ -371,6 +515,37 @@ int main() {
 		glDrawArrays(GL_TRIANGLES, 0, 30);
 		glBindVertexArray(0);
 		glDepthFunc(GL_LESS); // Set depth function back to default
+
+		glBindBuffer(GL_ARRAY_BUFFER, particlesVBO);
+		glBindVertexArray(pariclesVAO);
+		particalsShader.use();
+		particalsShader.setMat4("model", model);
+		particalsShader.setMat4("view", view);
+		particalsShader.setMat4("projection", projection);
+		test.init();
+		test.update();
+		test.display(camera.Position.x, camera.Position.y, camera.Position.z);
+
+		glBindVertexArray(0);
+
+		// don't forget to enable shader before setting uniforms
+		ourShader.use();
+		// view/projection transformations
+		//glm::mat4 treeProjection = glm::perspective(camera.Zoom, (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.1f, 100.0f);
+		//glm::mat4 treeView = camera.GetViewMatrix();
+		ourShader.setMat4("projection", projection);
+		ourShader.setMat4("view", view);
+		ourShader.setVec3("viewPos", camera.Position.x, camera.Position.y, camera.Position.z);
+		// render the loaded model
+		for (int i = 0; i < 50; i++) {
+			glm::mat4 treeModel;
+			treeModel = glm::translate(treeModel, glm::vec3(50.0f + deviations_x[i], -3.0f, 50.0f + deviations_y[i]));
+			treeModel = glm::scale(treeModel, glm::vec3(0.35f, 0.35f, 0.35f));	// it's a bit too big for our scene, so scale it down
+			ourShader.setMat4("model", treeModel);
+			ourModel.Draw(ourShader);
+		}
+
+		RenderText(textShader, "OpenGL is fun", 750.0f, 750.0f, 0.5f, glm::vec3(0.3, 0.7f, 0.9f));
 
 		//-------------------------------------------------------------------------------------------
 		shader_shadow.use();
@@ -437,7 +612,7 @@ int main() {
 		glBindVertexArray(0);
 		glStencilMask(0xFF);
 		glEnable(GL_DEPTH_TEST);
-
+		assert(glGetError() == GL_NO_ERROR);
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
@@ -621,6 +796,52 @@ void addVertice(float *vertices, int offset, glm::vec3 pos, glm::vec3 nm, glm::v
   vertices[offset + 7] = txt.y;
   vertices[offset + 8] = nmmap.x;
   vertices[offset + 9] = nmmap.y;
+}
+
+void RenderText(Shader &shader, string text, GLfloat x, GLfloat y, GLfloat scale, glm::vec3 color)
+{
+	// Activate corresponding render state	
+	shader.use();
+	shader.setVec3("textColor", color.x, color.y, color.z);
+	//glUniform3f(glGetUniformLocation(shader.ID, "textColor"), color.x, color.y, color.z);
+	glActiveTexture(GL_TEXTURE0);
+	glBindVertexArray(TextVAO);
+
+	// Iterate through all characters
+	string::const_iterator c;
+	for (c = text.begin(); c != text.end(); c++)
+	{
+		Character ch = Characters[*c];
+
+		GLfloat xpos = x + ch.Bearing.x * scale;
+		GLfloat ypos = y - (ch.Size.y - ch.Bearing.y) * scale;
+
+		GLfloat w = ch.Size.x * scale;
+		GLfloat h = ch.Size.y * scale;
+		// Update VBO for each character
+		GLfloat vertices[6][4] = {
+			{ xpos,     ypos + h,   0.0, 0.0 },
+		{ xpos,     ypos,       0.0, 1.0 },
+		{ xpos + w, ypos,       1.0, 1.0 },
+
+		{ xpos,     ypos + h,   0.0, 0.0 },
+		{ xpos + w, ypos,       1.0, 1.0 },
+		{ xpos + w, ypos + h,   1.0, 0.0 }
+		};
+		// Render glyph texture over quad
+		glBindTexture(GL_TEXTURE_2D, ch.TextureID);
+		// Update content of VBO memory
+		glBindBuffer(GL_ARRAY_BUFFER, TextVBO);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); // Be sure to use glBufferSubData and not glBufferData
+
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		// Render quad
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+		// Now advance cursors for next glyph (note that advance is number of 1/64 pixels)
+		x += (ch.Advance >> 6) * scale; // Bitshift by 6 to get value in pixels (2^6 = 64 (divide amount of 1/64th pixels by 64 to get amount of pixels))
+	}
+	glBindVertexArray(0);
+	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 /*

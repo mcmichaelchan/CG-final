@@ -1,0 +1,22 @@
+newmtl lambert2SG
+illum 4
+Kd 0.00 0.00 0.00
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+map_Kd -s 0.0285714 0.0285714 Bitmap2Material_3_Base_Color.tga
+bump -s 0.0285714 0.0285714 Bitmap2Material_3_Normal.tga -bm 0.654762
+Ni 1.00
+newmtl lambert3SG
+illum 4
+Kd 0.00 0.00 0.00
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+map_Kd branch_diff_alpha.tga
+Ni 1.00
+newmtl lambert4SG
+illum 4
+Kd 0.00 0.00 0.00
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+map_Kd -s 0.05 0.05 TexturesCom_Grass0150_1_seamless_S.jpg
+Ni 1.00
