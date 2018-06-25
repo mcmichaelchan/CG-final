@@ -37,6 +37,7 @@ vector<vector<int>> m_textures;
 bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
+float *vertices = nullptr;
 float lastX = (float)WINDOW_WIDTH / 2.0;
 float lastY = (float)WINDOW_HEIGHT / 2.0;
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -44,15 +45,16 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 vector<vector<int>> readMap(const char *path);
-void terrainVertexCalculation(float *vertices, vector<vector<int>> map, int size);
+vector<vector<glm::vec3>> terrainVertexCalculation(float *vertices, vector<vector<int>> map, int size);
 void addVertice(float *vertices, int offset, glm::vec3 pos, glm::vec3 nm, glm::vec2 txt, glm::vec2 nmmap, glm::vec3 tan, glm::vec3 bitan);
 void RenderText(Shader &shader, string text, GLfloat x, GLfloat y, GLfloat scale, glm::vec3 color);
 void TBNcalculation(glm::vec3 edge1, glm::vec3 edge2, glm::vec2 deltaUV1, glm::vec2 deltaUV2, glm::vec3 &tan, glm::vec3 &bitan);
+void nmSum(vector<vector<glm::vec3>> nmArray);
 glm::vec3 crossProduct(glm::vec3 a, glm::vec3 b);
 glm::mat4 lightSpaceMatrix;
 
 
-void DepthMap(Shader shader1, Shader shader2, Shader shader3);
+void DepthMap(Shader shader1);
 
 void renderScene(Shader shader);
 void renderCube(Shader shader1);
@@ -61,6 +63,7 @@ void renderCube(Shader shader1);
 unsigned int VAO, VBO, EBO;
 GLuint skyboxVAO, skyboxVBO;
 GLuint cubeVAO, cubeVBO;
+GLuint TextVAO, TextVBO;
 
 glm::vec3 lightPos = glm::vec3(48.0f, 17.0f, 3.0f);
 
@@ -71,10 +74,8 @@ GLuint terrainTexture;
 GLuint normalMap;
 GLuint woodTexture;
 
-//2D�����С
 const GLuint SHADOW_WIDTH = 4096, SHADOW_HEIGHT = 4096;
 
-//��ͼ��С
 int mapsize;
 int itemNums = 16;
 
@@ -84,7 +85,6 @@ glm::mat4 skyboxModel;
 glm::mat4 view;
 glm::mat4 projection;
 
-//cube
 float cube[] = {
 	//top
 	0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
@@ -176,6 +176,13 @@ const GLfloat skyboxVertices[] = {
   1.0f, -1.0f,  1.0f
 };
 
+struct Character {
+  GLuint TextureID;
+  glm::ivec2 Size;
+  glm::ivec2 Bearing;
+  GLuint Advance;
+};
+map<GLchar, Character> Characters;
 
 
 int main() {
@@ -305,7 +312,6 @@ int main() {
 	Shader skyboxShader("shader/skyboxVs.txt", "shader/skyboxFrag.txt");
 	Shader particalsShader("shader/vShaderSrcParticals.txt", "shader/fShaderSrcParticals.txt");
 	Shader shader_simple("shader/vShaderSrc_simple.txt", "shader/fShaderSrc_simple.txt");
-	Shader shader_noe("shader/vShaderSrc_noe.txt", "shader/fShaderSrc_noe.txt");
 	Shader shader_shadow("shader/vShaderSrc_shadow.txt", "shader/fShaderSrc_shadow.txt");
 	Shader shader_light("shader/vShaderSrc_light.txt", "shader/fShaderSrc_light.txt");
 	Shader shader_cube("shader/vShaderSrc_cube.txt", "shader/fShaderSrc_cube.txt");
@@ -314,9 +320,9 @@ int main() {
   // read map from files and calculate terrain data
   vector<vector<int>> map = readMap("texture/map3.bmp");
   mapsize = (map.size() - 1) * (map[0].size() - 1);
-  float *vertices = new float[mapsize * 6 * itemNums];
+  vertices = new float[mapsize * 6 * itemNums];
   
-  terrainVertexCalculation(vertices, map, mapsize);
+  nmSum(terrainVertexCalculation(vertices, map, mapsize));
 
 	glGenVertexArrays(1, &VAO);
 	glGenBuffers(1, &VBO);
@@ -476,8 +482,7 @@ int main() {
     //lightPos = camera.Position;
 
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
-		glClear(GL_DEPTH_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
 		cubeModel = glm::mat4(1);
 		model = glm::mat4(1);
@@ -492,7 +497,7 @@ int main() {
 
     	//scene rendered here
 		glDepthFunc(GL_LESS);
-	    DepthMap(shader_simple, shader_shadow, shader_cube);
+	    DepthMap(shader_simple);
 
 		// Draw skybox at last
 		glDepthFunc(GL_LEQUAL);  // Change depth function so depth test passes when values are equal to depth buffer's content
@@ -522,9 +527,9 @@ int main() {
 		particalsShader.setMat4("model", model);
 		particalsShader.setMat4("view", view);
 		particalsShader.setMat4("projection", projection);
-		test.init();
-		test.update();
-		test.display(camera.Position.x, camera.Position.y, camera.Position.z);
+		//test.init();
+		//test.update();
+		//test.display(camera.Position.x, camera.Position.y, camera.Position.z);
 
 		glBindVertexArray(0);
 
@@ -679,25 +684,27 @@ glm::vec3 crossProduct(glm::vec3 a, glm::vec3 b) {
 	return glm::vec3{ (float)(a.y*b.z) - (float)(b.y*a.z), (float)(b.x*a.z) - (float)(a.x*b.z), (float)(a.x*b.y) - (float)(b.x*a.y) };
 }
 
-void terrainVertexCalculation(float *vertices, vector<vector<int>> map, int size) {
+vector<vector<glm::vec3>> terrainVertexCalculation(float *vertices, vector<vector<int>> map, int size) {
+  vector<vector<glm::vec3>> nmArray;
+  vector<glm::vec3> nmRow;
   int scaleSize = 15;
   for (int i = 0, j = 0, k = 0; i < size * 6 * itemNums - map[0].size() * 6 * itemNums; i += 6 * itemNums) {
     // vertex 1
     glm::vec3 vtx1pos = glm::vec3((float)j / (float)map[0].size(), (float)k / (float)map.size(), (float)map[j][k] / 256.0f / scaleSize);
     glm::vec2 vtx1txt = glm::vec2((float)j / (float)map[0].size() * 50, (float)k / (float)map.size() * 50);
-    glm::vec2 vtx1nmmap = glm::vec2((float)j / (float)map[0].size() * 20, (float)k / (float)map.size() * 20);
+    glm::vec2 vtx1nmmap = glm::vec2((float)j / (float)map[0].size() * 10, (float)k / (float)map.size() * 10);
     // vertex 2
     glm::vec3 vtx2pos = glm::vec3((float)j / (float)map[0].size(), (float)(k + 1) / (float)map.size(), (float)map[j][k + 1] / 256.0f / scaleSize);
     glm::vec2 vtx2txt = glm::vec2((float)j / (float)map[0].size() * 50, (float)(k + 1) / (float)map.size() * 50);
-    glm::vec2 vtx2nmmap = glm::vec2((float)j / (float)map[0].size() * 20, (float)(k + 1) / (float)map.size() * 20);
+    glm::vec2 vtx2nmmap = glm::vec2((float)j / (float)map[0].size() * 10, (float)(k + 1) / (float)map.size() * 10);
     // vertex 3
     glm::vec3 vtx3pos = glm::vec3((float)(j + 1) / (float)map[0].size(), (float)k / (float)map.size(), (float)map[j + 1][k] / 256.0f / scaleSize);
     glm::vec2 vtx3txt = glm::vec2((float)(j + 1) / (float)map[0].size() * 50, (float)k / (float)map.size() * 50);
-    glm::vec2 vtx3nmmap = glm::vec2((float)(j + 1) / (float)map[0].size() * 20, (float)k / (float)map.size() * 20);
+    glm::vec2 vtx3nmmap = glm::vec2((float)(j + 1) / (float)map[0].size() * 10, (float)k / (float)map.size() * 10);
     // vertex 4
     glm::vec3 vtx4pos = glm::vec3((float)(j + 1) / (float)map[0].size(), (float)(k + 1) / (float)map.size(), (float)map[j + 1][k + 1] / 256.0f / scaleSize);
     glm::vec2 vtx4txt = glm::vec2((float)(j + 1) / (float)map[0].size() * 50, (float)(k + 1) / (float)map.size() * 50);
-    glm::vec2 vtx4nmmap = glm::vec2((float)(j + 1) / (float)map[0].size() * 20, (float)(k + 1) / (float)map.size() * 20);
+    glm::vec2 vtx4nmmap = glm::vec2((float)(j + 1) / (float)map[0].size() * 10, (float)(k + 1) / (float)map.size() * 10);
     // triangle 1
     glm::vec3 tr1edge1 = vtx2pos - vtx1pos;
     glm::vec3 tr1edge2 = vtx3pos - vtx1pos;
@@ -723,13 +730,59 @@ void terrainVertexCalculation(float *vertices, vector<vector<int>> map, int size
     addVertice(vertices, i + 3 * itemNums, vtx2pos, -tr2nm, vtx2txt, vtx2nmmap, tr2tan, tr2bitan);
     addVertice(vertices, i + 4 * itemNums, vtx3pos, -tr2nm, vtx3txt, vtx3nmmap, tr2tan, tr2bitan);
     addVertice(vertices, i + 5 * itemNums, vtx4pos, -tr2nm, vtx4txt, vtx4nmmap, tr2tan, tr2bitan);
+    nmRow.push_back(tr1nm);
+    nmRow.push_back(-tr2nm);
     k++;
     if (k >= (map[0].size() - 2)) {
       k = 0;
       j++;
+      nmArray.push_back(nmRow);
+      nmRow.clear();
+    }
+  }
+  return nmArray;
+}
+
+void nmSum(vector<vector<glm::vec3>> nmArray) {
+  for (int i = 1; i < nmArray.size() ; i++) {
+    for (int j = 1; j < nmArray[0].size() - 1; j++) {
+      glm::vec3 nm = glm::normalize(nmArray[i - 1][j - 1] + nmArray[i - 1][j] + nmArray[i - 1][j + 1] + nmArray[i][j - 1] + nmArray[i][j] + nmArray[i][j + 1]);
+      // i-1 j-1
+      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j - 1) + 2 * itemNums + 3] = nm.x;
+      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j - 1) + 2 * itemNums + 4] = nm.y;
+      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j - 1) + 2 * itemNums + 5] = nm.z;
+      // i-1 j
+      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * j + 2 * itemNums + 3] = nm.x;
+      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * j + 2 * itemNums + 4] = nm.y;
+      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * j + 2 * itemNums + 5] = nm.z;
+      // i-1 j+1
+      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j + 1) + 1 * itemNums + 3] = nm.x;
+      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j + 1) + 1 * itemNums + 4] = nm.y;
+      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j + 1) + 1 * itemNums + 5] = nm.z;
+      // i j-1
+      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j - 1) + 1 * itemNums + 3] = nm.x;
+      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j - 1) + 1 * itemNums + 4] = nm.y;
+      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j - 1) + 1 * itemNums + 5] = nm.z;
+      // i j
+      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * j + 3] = nm.x;
+      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * j + 4] = nm.y;
+      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * j + 5] = nm.z;
+      // i j+1
+      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j + 1) + 3] = nm.x;
+      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j + 1) + 4] = nm.y;
+      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j + 1) + 5] = nm.z;
     }
   }
 }
+
+//vector<glm::vec3> normalCalculation(glm::vec3 nm1, glm::vec3 nm2, glm::vec3 nm3, glm::vec3 nm4, glm::vec3 nm5, glm::vec3 nm6, int row, int col) {
+//  vector<glm::vec3> verticeNm;
+//  for (int i = col * itemNums, j = 1, k = 0; i < size * 6 * itemNums - map[0].size() * 6 * itemNums; i += itemNums) {
+//
+//  }
+//}
+
+
 
 void TBNcalculation(glm::vec3 edge1, glm::vec3 edge2, glm::vec2 deltaUV1, glm::vec2 deltaUV2, glm::vec3 &tan, glm::vec3 &bitan) {
   GLfloat f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
@@ -745,7 +798,7 @@ void TBNcalculation(glm::vec3 edge1, glm::vec3 edge2, glm::vec2 deltaUV1, glm::v
   bitan = glm::normalize(bitan);
 }
 
-void renderScene(Shader shader) {
+void renderScene(Shader shader1) {
 	// Draw terrain.
 	shader1.use();
 	model = glm::scale(model, glm::vec3(100.0f, 100.0f, 100.0f));
@@ -875,7 +928,7 @@ void RenderText(Shader &shader, string text, GLfloat x, GLfloat y, GLfloat scale
 
 
 /*
-// calculate ������
+// calculate
 glm::vec3 v0 = glm::vec3{ (float)j / (float)map[0].size(), (float)k / (float)map.size(), (float)map[j][k] / 256.0f / 8 };
 glm::vec3 v1;
 glm::vec3 v2;
@@ -932,7 +985,7 @@ b = v1 - v0;
 n4 = crossProduct(a, b);
 }
 
-//��ӹ�һ
+//
 glm::vec3 Nor = n1 + n2 + n3 + n4;
 
 vertices[i + 3] = Nor.x;
