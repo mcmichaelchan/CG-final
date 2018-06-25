@@ -25,7 +25,7 @@ using namespace std;
 
 // global variables
 //Camera camera(glm::vec3(49.0f, 39.0f, -48.0f)); // LIGHTPOS
-Camera camera(glm::vec3(0.0f, 0.0f, 0.0f)); // origin
+Camera camera(glm::vec3(48.0f, 0.0f, 40.0f)); // origin
 vector<vector<int>> m_textures;
 bool firstMouse = true;
 float deltaTime = 0.0f;
@@ -53,7 +53,7 @@ unsigned int VAO, VBO, EBO;
 GLuint skyboxVAO, skyboxVBO;
 
 //光源位置
-glm::vec3 lightPos = glm::vec3(49.0f, 39.0f, -48.0f);
+glm::vec3 lightPos = glm::vec3(48.0f, 17.0f, 3.0f);
 //深度贴图帧缓冲
 GLuint depthMapFBO;
 //2D纹理
@@ -127,6 +127,7 @@ int main() {
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwWindowHint(GLFW_SAMPLES, 4);
 
 	// Create a window & context/viewpoint setting
 	GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Final OpenGL Project", NULL, NULL);
@@ -215,9 +216,9 @@ int main() {
 	// load terrain texture
   terrainTexture = TextureLoading::LoadTexture((GLchar*)"texture/sand_texture3.jpg");
   // load normal map texture
-  normalMap = TextureLoading::LoadTexture((GLchar*)"texture/sand_normal.jpg");
+  normalMap = TextureLoading::LoadTexture((GLchar*)"texture/sand_normal3.jpg");
 
-	//---depthmap
+	// depthmap
 	glGenFramebuffers(1, &depthMapFBO);
 	glGenTextures(1, &depthMap);
 	glBindTexture(GL_TEXTURE_2D, depthMap);
@@ -233,7 +234,8 @@ int main() {
 	glDrawBuffer(GL_NONE);
 	glReadBuffer(GL_NONE);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
+  glEnable(GL_MULTISAMPLE);
+  glEnable(GL_POLYGON_SMOOTH);
 	// shader configuration
 	// --------------------
 	shader_shadow.use();
@@ -256,7 +258,7 @@ int main() {
 		// init ImGui
 		//ImGui_ImplGlfwGL3_NewFrame();
 
-    lightPos = camera.Position;
+    //lightPos = camera.Position;
 
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -281,7 +283,7 @@ int main() {
     skyboxModel = glm::translate(skyboxModel, glm::vec3(50.0f, -2.0f, 50.0f));
 		skyboxModel = glm::scale(skyboxModel, glm::vec3(50.0f, 50.0f, 50.0f));
 
-		//view = glm::mat4(glm::mat3(camera.GetViewMatrix()));	// Remove any translation component of the view matrix
+		//view = glm::mat4(glm::mat3(camera.GetViewMatrix()));	// Remove any translation component of the view modelmatrix
 		skyboxShader.setMat4("model", skyboxModel);
 		skyboxShader.setMat4("view", view);
 		skyboxShader.setMat4("projection", projection);
@@ -362,25 +364,24 @@ glm::vec3 crossProduct(glm::vec3 a, glm::vec3 b) {
 }
 
 void terrainVertexCalculation(float *vertices, vector<vector<int>> map, int size) {
-  int scaleSize = 10;
-  int i = 0, j = 0, k = 0;
-  for (; i < size * 6 * itemNums - map[0].size() * 6 * itemNums; i += 6 * itemNums) {
+  int scaleSize = 15;
+  for (int i = 0, j = 0, k = 0; i < size * 6 * itemNums - map[0].size() * 6 * itemNums; i += 6 * itemNums) {
     // vertex 1
     glm::vec3 vtx1pos = glm::vec3((float)j / (float)map[0].size(), (float)k / (float)map.size(), (float)map[j][k] / 256.0f / scaleSize);
     glm::vec2 vtx1txt = glm::vec2((float)j / (float)map[0].size() * 50, (float)k / (float)map.size() * 50);
-    glm::vec2 vtx1nmmap = glm::vec2((float)j / (float)map[0].size() * 100, (float)k / (float)map.size() * 100);
+    glm::vec2 vtx1nmmap = glm::vec2((float)j / (float)map[0].size() * 20, (float)k / (float)map.size() * 20);
     // vertex 2
     glm::vec3 vtx2pos = glm::vec3((float)j / (float)map[0].size(), (float)(k + 1) / (float)map.size(), (float)map[j][k + 1] / 256.0f / scaleSize);
     glm::vec2 vtx2txt = glm::vec2((float)j / (float)map[0].size() * 50, (float)(k + 1) / (float)map.size() * 50);
-    glm::vec2 vtx2nmmap = glm::vec2((float)j / (float)map[0].size() * 100, (float)(k + 1) / (float)map.size() * 100);
+    glm::vec2 vtx2nmmap = glm::vec2((float)j / (float)map[0].size() * 20, (float)(k + 1) / (float)map.size() * 20);
     // vertex 3
     glm::vec3 vtx3pos = glm::vec3((float)(j + 1) / (float)map[0].size(), (float)k / (float)map.size(), (float)map[j + 1][k] / 256.0f / scaleSize);
     glm::vec2 vtx3txt = glm::vec2((float)(j + 1) / (float)map[0].size() * 50, (float)k / (float)map.size() * 50);
-    glm::vec2 vtx3nmmap = glm::vec2((float)(j + 1) / (float)map[0].size() * 100, (float)k / (float)map.size() * 100);
+    glm::vec2 vtx3nmmap = glm::vec2((float)(j + 1) / (float)map[0].size() * 20, (float)k / (float)map.size() * 20);
     // vertex 4
     glm::vec3 vtx4pos = glm::vec3((float)(j + 1) / (float)map[0].size(), (float)(k + 1) / (float)map.size(), (float)map[j + 1][k + 1] / 256.0f / scaleSize);
     glm::vec2 vtx4txt = glm::vec2((float)(j + 1) / (float)map[0].size() * 50, (float)(k + 1) / (float)map.size() * 50);
-    glm::vec2 vtx4nmmap = glm::vec2((float)(j + 1) / (float)map[0].size() * 100, (float)(k + 1) / (float)map.size() * 100);
+    glm::vec2 vtx4nmmap = glm::vec2((float)(j + 1) / (float)map[0].size() * 20, (float)(k + 1) / (float)map.size() * 20);
     // triangle 1
     glm::vec3 tr1edge1 = vtx2pos - vtx1pos;
     glm::vec3 tr1edge2 = vtx3pos - vtx1pos;
@@ -403,16 +404,15 @@ void terrainVertexCalculation(float *vertices, vector<vector<int>> map, int size
     addVertice(vertices, i, vtx1pos, tr1nm, vtx1txt, vtx1nmmap, tr1tan, tr1bitan);
     addVertice(vertices, i + 1 * itemNums, vtx2pos, tr1nm, vtx2txt, vtx2nmmap, tr1tan, tr1bitan);
     addVertice(vertices, i + 2 * itemNums, vtx3pos, tr1nm, vtx3txt, vtx3nmmap, tr1tan, tr1bitan);
-    addVertice(vertices, i + 3 * itemNums, vtx2pos, tr2nm, vtx2txt, vtx2nmmap, tr2tan, tr2bitan);
-    addVertice(vertices, i + 4 * itemNums, vtx3pos, tr2nm, vtx3txt, vtx3nmmap, tr2tan, tr2bitan);
-    addVertice(vertices, i + 5 * itemNums, vtx4pos, tr2nm, vtx4txt, vtx4nmmap, tr2tan, tr2bitan);
+    addVertice(vertices, i + 3 * itemNums, vtx2pos, -tr2nm, vtx2txt, vtx2nmmap, tr2tan, tr2bitan);
+    addVertice(vertices, i + 4 * itemNums, vtx3pos, -tr2nm, vtx3txt, vtx3nmmap, tr2tan, tr2bitan);
+    addVertice(vertices, i + 5 * itemNums, vtx4pos, -tr2nm, vtx4txt, vtx4nmmap, tr2tan, tr2bitan);
     k++;
     if (k >= (map[0].size() - 2)) {
       k = 0;
       j++;
     }
   }
-  cout << j << endl;
 }
 
 void TBNcalculation(glm::vec3 edge1, glm::vec3 edge2, glm::vec2 deltaUV1, glm::vec2 deltaUV2, glm::vec3 &tan, glm::vec3 &bitan) {
@@ -451,15 +451,15 @@ void DepthMap(Shader shader1, Shader shader2) {
 	//	glm::vec3(0.0f, 1.0f, 0.0f) // Head is up (set to 0,-1,0 to look upside-down)		
 	//);
 
-  //glm::mat4 lightProjection = glm::perspective(45.0f, (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.01f, 100.0f);
-  //glm::mat4 lightView = glm::lookAt(
-  //  glm::vec3(49.0f, 39.0f, -48.0f),
-  //  glm::vec3(49.0f, 39.0f, -48.0f) + glm::vec3(0.0f, -0.4f, 0.9f),
-  //  glm::vec3(0.0f, 1.0f, 0.4f)
-  //);
+  glm::mat4 lightProjection = glm::perspective(45.0f, (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.01f, 500.0f);
+  glm::mat4 lightView = glm::lookAt(
+    lightPos,
+    glm::vec3(48.0f, 0.0f, 40.0f),
+    glm::vec3(0.0f, 1.0f, 0.0f)
+  );
 
-  glm::mat4 lightProjection = glm::perspective(camera.Zoom, (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.01f, 100.0f);
-  glm::mat4 lightView = camera.GetViewMatrix();
+  //glm::mat4 lightProjection = glm::perspective(camera.Zoom, (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.01f, 100.0f);
+  //glm::mat4 lightView = camera.GetViewMatrix();
 
 	lightSpaceMatrix = lightProjection * lightView;
 	
@@ -469,8 +469,10 @@ void DepthMap(Shader shader1, Shader shader2) {
 	glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
 	glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
 	glClear(GL_DEPTH_BUFFER_BIT);
-
-	renderScene(shader1);
+  glCullFace(GL_FRONT);
+  renderScene(shader1);
+  glCullFace(GL_BACK);
+	
   
 	//渲染后解绑framebuffer并用回原来的shader
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
