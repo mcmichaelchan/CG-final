@@ -54,10 +54,11 @@ glm::vec3 crossProduct(glm::vec3 a, glm::vec3 b);
 glm::mat4 lightSpaceMatrix;
 
 
-void DepthMap(Shader shader1);
+void DepthMap(Shader &shader1, Model &ourModel);
 
-void renderScene(Shader shader);
-void renderCube(Shader shader1);
+void renderScene(Shader &shader);
+void renderModel(Shader &shader1, Model &ourModel);
+void renderCube(Shader &shader1);
 
 
 unsigned int VAO, VBO, EBO;
@@ -79,6 +80,7 @@ const GLuint SHADOW_WIDTH = 4096, SHADOW_HEIGHT = 4096;
 int mapsize;
 int itemNums = 16;
 
+glm::mat4 treeModel;
 glm::mat4 cubeModel;
 glm::mat4 model;
 glm::mat4 skyboxModel;
@@ -184,6 +186,8 @@ struct Character {
 };
 map<GLchar, Character> Characters;
 
+//the position of models
+vector<float> deviations_x, deviations_y, deviations_z;
 
 int main() {
 	glfwInit();
@@ -397,7 +401,15 @@ int main() {
 	faces.push_back("skybox/sahara/bottom.tga");
 	faces.push_back("skybox/sahara/back.tga");
 	faces.push_back("skybox/sahara/front.tga");
-	GLuint cubemapTexture = TextureLoading::LoadCubemap(faces);
+
+  //faces.push_back("skybox/pure1/right.tga");
+  //faces.push_back("skybox/pure1/back.tga");
+  //faces.push_back("skybox/pure1/top.tga");
+  //faces.push_back("skybox/pure1/bottom.tga");
+  //faces.push_back("skybox/pure1/left.tga");
+  //faces.push_back("skybox/pure1/front.tga");
+
+  GLuint cubemapTexture = TextureLoading::LoadCubemap(faces);
 
 	// load terrain texture
     terrainTexture = TextureLoading::LoadTexture((GLchar*)"texture/sand_texture3.jpg");
@@ -446,23 +458,27 @@ int main() {
 	// particals init
 	particals_operator test;
 
-	vector<float> randoms, deviations_x, deviations_y;
-	for (int i = 0; i < 50; i++) {
-		if (rand() % 20 < 10) {
-			deviations_x.push_back(-(rand() % 30));
-		}
-		else {
-			deviations_x.push_back(rand() % 30);
-		}
-	}
-	for (int i = 0; i < 50; i++) {
-		if (rand() % 20 < 10) {
-			deviations_y.push_back(-(rand() % 30));
-		}
-		else {
-			deviations_y.push_back(rand() % 30);
-		}
-	}
+  deviations_x.push_back(24.1f); deviations_z.push_back(-0.9f); deviations_y.push_back(39.4f);
+  deviations_x.push_back(35.4f); deviations_z.push_back(-1.2f); deviations_y.push_back(30.0f);
+  deviations_x.push_back(28.0f); deviations_z.push_back(-1.6f); deviations_y.push_back(50.0f);
+  deviations_x.push_back(22.1f); deviations_z.push_back(-1.7f); deviations_y.push_back(60.0f);
+  deviations_x.push_back(23.7f); deviations_z.push_back(-1.45f); deviations_y.push_back(21.9f);
+  deviations_x.push_back(54.3f); deviations_z.push_back(-1.41f); deviations_y.push_back(30.8f);
+  deviations_x.push_back(53.7f); deviations_z.push_back(-1.45f); deviations_y.push_back(44.5f);
+  deviations_x.push_back(40.5f); deviations_z.push_back(-3.2f); deviations_y.push_back(52.9f);
+  deviations_x.push_back(33.4f); deviations_z.push_back(-1.91f); deviations_y.push_back(43.9f);
+  deviations_x.push_back(45.3f); deviations_z.push_back(-2.8f); deviations_y.push_back(26.4f);
+
+  deviations_x.push_back(30.2f); deviations_z.push_back(-2.7f); deviations_y.push_back(58.4f);
+  deviations_x.push_back(20.0f); deviations_z.push_back(-1.3f); deviations_y.push_back(52.8f);
+  deviations_x.push_back(17.6f); deviations_z.push_back(-2.17f); deviations_y.push_back(41.24f);
+  deviations_x.push_back(28.4f); deviations_z.push_back(-1.6f); deviations_y.push_back(39.1f);
+  deviations_x.push_back(29.8f); deviations_z.push_back(-1.75f); deviations_y.push_back(25.5f);
+  deviations_x.push_back(29.86f); deviations_z.push_back(-2.02f); deviations_y.push_back(34.8f);
+  deviations_x.push_back(36.8f); deviations_z.push_back(-2.25f); deviations_y.push_back(44.9f);
+  deviations_x.push_back(47.67f); deviations_z.push_back(-2.85f); deviations_y.push_back(43.3f);
+  deviations_x.push_back(40.2f); deviations_z.push_back(-3.19f); deviations_y.push_back(34.1f);
+  deviations_x.push_back(51.37f); deviations_z.push_back(-2.15f); deviations_y.push_back(38.7f);
 
   // depth test
 	glEnable(GL_DEPTH_TEST);
@@ -497,7 +513,7 @@ int main() {
 
     	//scene rendered here
 		glDepthFunc(GL_LESS);
-	    DepthMap(shader_simple);
+	    DepthMap(shader_simple, ourModel);
 
 		// Draw skybox at last
 		glDepthFunc(GL_LEQUAL);  // Change depth function so depth test passes when values are equal to depth buffer's content
@@ -527,9 +543,9 @@ int main() {
 		particalsShader.setMat4("model", model);
 		particalsShader.setMat4("view", view);
 		particalsShader.setMat4("projection", projection);
-		//test.init();
-		//test.update();
-		//test.display(camera.Position.x, camera.Position.y, camera.Position.z);
+		test.init();
+		test.update();
+	  test.display(camera.Position.x, camera.Position.y, camera.Position.z);
 
 		glBindVertexArray(0);
 
@@ -542,10 +558,10 @@ int main() {
 		ourShader.setMat4("view", view);
 		ourShader.setVec3("viewPos", camera.Position.x, camera.Position.y, camera.Position.z);
 		// render the loaded model
-		for (int i = 0; i < 50; i++) {
+		for (int i = 0; i < 20; i++) {
 			glm::mat4 treeModel;
-			treeModel = glm::translate(treeModel, glm::vec3(50.0f + deviations_x[i], -3.0f, 50.0f + deviations_y[i]));
-			treeModel = glm::scale(treeModel, glm::vec3(0.35f, 0.35f, 0.35f));	// it's a bit too big for our scene, so scale it down
+			treeModel = glm::translate(treeModel, glm::vec3(deviations_x[i], deviations_z[i], deviations_y[i]));
+			treeModel = glm::scale(treeModel, glm::vec3(0.3f, 0.3f, 0.3f));	// it's a bit too big for our scene, so scale it down
 			ourShader.setMat4("model", treeModel);
 			ourModel.Draw(ourShader);
 		}
@@ -798,7 +814,7 @@ void TBNcalculation(glm::vec3 edge1, glm::vec3 edge2, glm::vec2 deltaUV1, glm::v
   bitan = glm::normalize(bitan);
 }
 
-void renderScene(Shader shader1) {
+void renderScene(Shader &shader1) {
 	// Draw terrain.
 	shader1.use();
 	model = glm::scale(model, glm::vec3(100.0f, 100.0f, 100.0f));
@@ -812,7 +828,20 @@ void renderScene(Shader shader1) {
 	glBindVertexArray(0);
 }
 
-void renderCube(Shader shader1) {
+void renderModel(Shader &shader1, Model &ourModel) {
+  shader1.use();
+  //ourShader.setVec3("viewPos", camera.Position.x, camera.Position.y, camera.Position.z);
+  // render the loaded model
+  for (int i = 0; i < 20; i++) {
+    treeModel = glm::mat4(1);
+    treeModel = glm::translate(treeModel, glm::vec3(deviations_x[i], deviations_z[i], deviations_y[i]));
+    treeModel = glm::scale(treeModel, glm::vec3(0.3f, 0.3f, 0.3f));	// it's a bit too big for our scene, so scale it down
+    shader1.setMat4("model", treeModel);
+    ourModel.Draw(shader1);
+  }
+}
+
+void renderCube(Shader &shader1) {
 	shader1.use();
 	
 	model = glm::translate(model, glm::vec3(41.0f, -2.0f, 41.0f));
@@ -828,7 +857,7 @@ void renderCube(Shader shader1) {
 	glBindVertexArray(0);
 }
 
-void DepthMap(Shader shader1) {
+void DepthMap(Shader &shader1, Model &ourModel) {
 	model = glm::scale(model, glm::vec3(100.0f, 100.0f, 100.0f));
 	model = glm::rotate(model, 90.0f, glm::vec3(1.0, 0.0, 0.0));
 
@@ -853,6 +882,7 @@ void DepthMap(Shader shader1) {
 	glClear(GL_DEPTH_BUFFER_BIT);
     glCullFace(GL_FRONT);
     renderScene(shader1);
+    renderModel(shader1, ourModel);
     glCullFace(GL_BACK);
 	renderCube(shader1);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
