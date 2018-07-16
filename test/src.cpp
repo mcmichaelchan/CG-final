@@ -4,8 +4,6 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-#include <imgui/imgui.h>
-#include <imgui/imgui_impl_glfw_gl3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -32,7 +30,7 @@ using namespace std;
 
 // global variables
 //Camera camera(glm::vec3(49.0f, 39.0f, -48.0f)); // LIGHTPOS
-Camera camera(glm::vec3(48.0f, 0.0f, 40.0f)); // origin
+Camera camera(glm::vec3(48.0f, 0.1f, 40.0f)); // origin
 vector<vector<int>> m_textures;
 bool firstMouse = true;
 float deltaTime = 0.0f;
@@ -50,7 +48,6 @@ void addVertice(float *vertices, int offset, glm::vec3 pos, glm::vec3 nm, glm::v
 void RenderText(Shader &shader, string text, GLfloat x, GLfloat y, GLfloat scale, glm::vec3 color);
 void TBNcalculation(glm::vec3 edge1, glm::vec3 edge2, glm::vec2 deltaUV1, glm::vec2 deltaUV2, glm::vec3 &tan, glm::vec3 &bitan);
 void nmSum(vector<vector<glm::vec3>> nmArray);
-glm::vec3 crossProduct(glm::vec3 a, glm::vec3 b);
 glm::mat4 lightSpaceMatrix;
 
 
@@ -61,7 +58,7 @@ void renderModel(Shader &shader1, Model &ourModel);
 void renderCube(Shader &shader1);
 
 
-unsigned int VAO, VBO, EBO;
+unsigned int VAO, VBO, EBO, VAO_test, VBO_test;
 GLuint skyboxVAO, skyboxVBO;
 GLuint cubeVAO, cubeVBO;
 GLuint TextVAO, TextVBO;
@@ -75,7 +72,7 @@ GLuint terrainTexture;
 GLuint normalMap;
 GLuint woodTexture;
 
-const GLuint SHADOW_WIDTH = 4096, SHADOW_HEIGHT = 4096;
+const GLuint SHADOW_WIDTH = 4096 * 2, SHADOW_HEIGHT = 4096 * 2;
 
 int mapsize;
 int itemNums = 16;
@@ -86,6 +83,16 @@ glm::mat4 model;
 glm::mat4 skyboxModel;
 glm::mat4 view;
 glm::mat4 projection;
+
+float depthmap_test[] = {
+  0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+  0.0f, 100.0f, 0.0f, 0.0f, 1.0f,
+  100.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+
+  100.0f, 100.0f, 0.0f, 1.0f, 1.0f,
+  0.0f, 100.0f, 0.0f, 0.0f, 1.0f,
+  100.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+};
 
 float cube[] = {
 	//top
@@ -312,7 +319,6 @@ int main() {
 	Model ourModel("objects/Palm_01/Palm_01.obj");
 
 	// Setup and compile our shaders
-	Shader shader("shader/vShaderSrc.txt", "shader/fShaderSrc.txt");
 	Shader skyboxShader("shader/skyboxVs.txt", "shader/skyboxFrag.txt");
 	Shader particalsShader("shader/vShaderSrcParticals.txt", "shader/fShaderSrcParticals.txt");
 	Shader shader_simple("shader/vShaderSrc_simple.txt", "shader/fShaderSrc_simple.txt");
@@ -320,6 +326,7 @@ int main() {
 	Shader shader_light("shader/vShaderSrc_light.txt", "shader/fShaderSrc_light.txt");
 	Shader shader_cube("shader/vShaderSrc_cube.txt", "shader/fShaderSrc_cube.txt");
 	Shader shader_border("shader/vShaderSrc_border.txt", "shader/fShaderSrc_border.txt");
+  Shader shader_test("shader/vShaderSrc_depthtest.txt", "shader/fShaderSrc_depthtest.txt");
 
   // read map from files and calculate terrain data
   vector<vector<int>> map = readMap("texture/map3.bmp");
@@ -327,6 +334,18 @@ int main() {
   vertices = new float[mapsize * 6 * itemNums];
   
   nmSum(terrainVertexCalculation(vertices, map, mapsize));
+
+  //test----------------------------------------------
+  glGenVertexArrays(1, &VAO_test);
+  glGenBuffers(1, &VBO_test);
+  glBindVertexArray(VAO_test);
+  glBindBuffer(GL_ARRAY_BUFFER, VBO_test);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(depthmap_test), depthmap_test, GL_STATIC_DRAW);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *)0);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*)(3 * sizeof(float)));
+  glEnableVertexAttribArray(1);
+  glBindVertexArray(0);
 
 	glGenVertexArrays(1, &VAO);
 	glGenBuffers(1, &VBO);
@@ -424,8 +443,8 @@ int main() {
 	glBindTexture(GL_TEXTURE_2D, depthMap);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
 		SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
@@ -458,27 +477,27 @@ int main() {
 	// particals init
 	particals_operator test;
 
-  deviations_x.push_back(24.1f); deviations_z.push_back(-0.9f); deviations_y.push_back(39.4f);
-  deviations_x.push_back(35.4f); deviations_z.push_back(-1.2f); deviations_y.push_back(30.0f);
-  deviations_x.push_back(28.0f); deviations_z.push_back(-1.6f); deviations_y.push_back(50.0f);
-  deviations_x.push_back(22.1f); deviations_z.push_back(-1.7f); deviations_y.push_back(60.0f);
-  deviations_x.push_back(23.7f); deviations_z.push_back(-1.45f); deviations_y.push_back(21.9f);
-  deviations_x.push_back(54.3f); deviations_z.push_back(-1.41f); deviations_y.push_back(30.8f);
-  deviations_x.push_back(53.7f); deviations_z.push_back(-1.45f); deviations_y.push_back(44.5f);
-  deviations_x.push_back(40.5f); deviations_z.push_back(-3.2f); deviations_y.push_back(52.9f);
-  deviations_x.push_back(33.4f); deviations_z.push_back(-1.91f); deviations_y.push_back(43.9f);
-  deviations_x.push_back(45.3f); deviations_z.push_back(-2.8f); deviations_y.push_back(26.4f);
+  deviations_x.push_back(36.42f); deviations_z.push_back(-0.64f); deviations_y.push_back(25.1f);
+  deviations_x.push_back(46.95f); deviations_z.push_back(-0.64f); deviations_y.push_back(34.7f);
+  deviations_x.push_back(46.8f); deviations_z.push_back(-0.82f); deviations_y.push_back(49.3f);
+  deviations_x.push_back(27.8f); deviations_z.push_back(-0.26f); deviations_y.push_back(38.7f);
+  deviations_x.push_back(24.0f); deviations_z.push_back(-0.26f); deviations_y.push_back(39.4f);
+  deviations_x.push_back(30.03f); deviations_z.push_back(-0.55f); deviations_y.push_back(34.4f);
+  deviations_x.push_back(30.05f); deviations_z.push_back(-0.36f); deviations_y.push_back(25.5f);
+  deviations_x.push_back(23.61f); deviations_z.push_back(-0.39f); deviations_y.push_back(21.6f);
+  deviations_x.push_back(45.33f); deviations_z.push_back(-0.67f); deviations_y.push_back(26.41f);
+  deviations_x.push_back(53.8f); deviations_z.push_back(-0.37f); deviations_y.push_back(30.93f);
 
-  deviations_x.push_back(30.2f); deviations_z.push_back(-2.7f); deviations_y.push_back(58.4f);
-  deviations_x.push_back(20.0f); deviations_z.push_back(-1.3f); deviations_y.push_back(52.8f);
-  deviations_x.push_back(17.6f); deviations_z.push_back(-2.17f); deviations_y.push_back(41.24f);
-  deviations_x.push_back(28.4f); deviations_z.push_back(-1.6f); deviations_y.push_back(39.1f);
-  deviations_x.push_back(29.8f); deviations_z.push_back(-1.75f); deviations_y.push_back(25.5f);
-  deviations_x.push_back(29.86f); deviations_z.push_back(-2.02f); deviations_y.push_back(34.8f);
-  deviations_x.push_back(36.8f); deviations_z.push_back(-2.25f); deviations_y.push_back(44.9f);
-  deviations_x.push_back(47.67f); deviations_z.push_back(-2.85f); deviations_y.push_back(43.3f);
-  deviations_x.push_back(40.2f); deviations_z.push_back(-3.19f); deviations_y.push_back(34.1f);
-  deviations_x.push_back(51.37f); deviations_z.push_back(-2.15f); deviations_y.push_back(38.7f);
+  deviations_x.push_back(40.08f); deviations_z.push_back(-0.81f); deviations_y.push_back(33.83f);
+  deviations_x.push_back(47.24f); deviations_z.push_back(-0.65f); deviations_y.push_back(43.18f);
+  deviations_x.push_back(53.71f); deviations_z.push_back(-0.35f); deviations_y.push_back(44.79f);
+  deviations_x.push_back(39.93f); deviations_z.push_back(-0.77f); deviations_y.push_back(52.7f);
+  deviations_x.push_back(22.02f); deviations_z.push_back(-0.40f); deviations_y.push_back(59.5f);
+  deviations_x.push_back(20.34f); deviations_z.push_back(-0.21f); deviations_y.push_back(53.2f);
+  deviations_x.push_back(30.25f); deviations_z.push_back(-0.60f); deviations_y.push_back(58.6f);
+  deviations_x.push_back(18.07f); deviations_z.push_back(-0.38f); deviations_y.push_back(41.3f);
+  deviations_x.push_back(28.3f); deviations_z.push_back(-0.37f); deviations_y.push_back(50.26f);
+  deviations_x.push_back(32.63f); deviations_z.push_back(-0.40f); deviations_y.push_back(50.0f);
 
   // depth test
 	glEnable(GL_DEPTH_TEST);
@@ -512,8 +531,18 @@ int main() {
 		glStencilMask(0x00);
 
     	//scene rendered here
-		glDepthFunc(GL_LESS);
+		//glDepthFunc(GL_LESS);
 	    DepthMap(shader_simple, ourModel);
+      /*shader_test.use();
+      shader_test.setInt("depthMap", 0);
+      shader_test.setMat4("view", view);
+      shader_test.setMat4("projection", projection);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, depthMap);
+      glBindVertexArray(VAO_test);
+      glDrawArrays(GL_TRIANGLES, 0, 6);
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);*/
+
 
 		// Draw skybox at last
 		glDepthFunc(GL_LEQUAL);  // Change depth function so depth test passes when values are equal to depth buffer's content
@@ -612,12 +641,13 @@ int main() {
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 		//-------------------------------------------------------------------------------------------
+    glStencilOp(GL_KEEP, GL_REPLACE, GL_REPLACE);
 		glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
 		glStencilMask(0x00);
 		glDisable(GL_DEPTH_TEST);
 
 		shader_border.use();
-		model = glm::translate(model, glm::vec3(41.0f, -2.0f, 41.0f));
+		model = glm::translate(model, glm::vec3(41.0f, 0.0f, 41.0f));
 		model = glm::rotate(model, 45.0f, glm::vec3(1.0, 1.0, 0.0));
 		model = glm::scale(model, glm::vec3(2.2f, 2.2f, 2.2f));
 
@@ -696,37 +726,33 @@ vector<vector<int>> readMap(const char *path) {
 	return map;
 }
 
-glm::vec3 crossProduct(glm::vec3 a, glm::vec3 b) {
-	return glm::vec3{ (float)(a.y*b.z) - (float)(b.y*a.z), (float)(b.x*a.z) - (float)(a.x*b.z), (float)(a.x*b.y) - (float)(b.x*a.y) };
-}
-
 vector<vector<glm::vec3>> terrainVertexCalculation(float *vertices, vector<vector<int>> map, int size) {
   vector<vector<glm::vec3>> nmArray;
   vector<glm::vec3> nmRow;
-  int scaleSize = 15;
+  int scaleSize = 40;
   for (int i = 0, j = 0, k = 0; i < size * 6 * itemNums - map[0].size() * 6 * itemNums; i += 6 * itemNums) {
     // vertex 1
     glm::vec3 vtx1pos = glm::vec3((float)j / (float)map[0].size(), (float)k / (float)map.size(), (float)map[j][k] / 256.0f / scaleSize);
     glm::vec2 vtx1txt = glm::vec2((float)j / (float)map[0].size() * 50, (float)k / (float)map.size() * 50);
-    glm::vec2 vtx1nmmap = glm::vec2((float)j / (float)map[0].size() * 10, (float)k / (float)map.size() * 10);
+    glm::vec2 vtx1nmmap = glm::vec2((float)j / (float)map[0].size() * 200, (float)k / (float)map.size() * 200);
     // vertex 2
     glm::vec3 vtx2pos = glm::vec3((float)j / (float)map[0].size(), (float)(k + 1) / (float)map.size(), (float)map[j][k + 1] / 256.0f / scaleSize);
     glm::vec2 vtx2txt = glm::vec2((float)j / (float)map[0].size() * 50, (float)(k + 1) / (float)map.size() * 50);
-    glm::vec2 vtx2nmmap = glm::vec2((float)j / (float)map[0].size() * 10, (float)(k + 1) / (float)map.size() * 10);
+    glm::vec2 vtx2nmmap = glm::vec2((float)j / (float)map[0].size() * 200, (float)(k + 1) / (float)map.size() * 200);
     // vertex 3
     glm::vec3 vtx3pos = glm::vec3((float)(j + 1) / (float)map[0].size(), (float)k / (float)map.size(), (float)map[j + 1][k] / 256.0f / scaleSize);
     glm::vec2 vtx3txt = glm::vec2((float)(j + 1) / (float)map[0].size() * 50, (float)k / (float)map.size() * 50);
-    glm::vec2 vtx3nmmap = glm::vec2((float)(j + 1) / (float)map[0].size() * 10, (float)k / (float)map.size() * 10);
+    glm::vec2 vtx3nmmap = glm::vec2((float)(j + 1) / (float)map[0].size() * 200, (float)k / (float)map.size() * 200);
     // vertex 4
     glm::vec3 vtx4pos = glm::vec3((float)(j + 1) / (float)map[0].size(), (float)(k + 1) / (float)map.size(), (float)map[j + 1][k + 1] / 256.0f / scaleSize);
     glm::vec2 vtx4txt = glm::vec2((float)(j + 1) / (float)map[0].size() * 50, (float)(k + 1) / (float)map.size() * 50);
-    glm::vec2 vtx4nmmap = glm::vec2((float)(j + 1) / (float)map[0].size() * 10, (float)(k + 1) / (float)map.size() * 10);
+    glm::vec2 vtx4nmmap = glm::vec2((float)(j + 1) / (float)map[0].size() * 200, (float)(k + 1) / (float)map.size() * 200);
     // triangle 1
     glm::vec3 tr1edge1 = vtx2pos - vtx1pos;
     glm::vec3 tr1edge2 = vtx3pos - vtx1pos;
     glm::vec2 tr1deltaUV1 = vtx2nmmap - vtx1nmmap;
     glm::vec2 tr1deltaUV2 = vtx3nmmap - vtx1nmmap;
-    glm::vec3 tr1nm = crossProduct(tr1edge1, tr1edge2);
+    glm::vec3 tr1nm = glm::cross(tr1edge1, tr1edge2);
     glm::vec3 tr1tan(1);
     glm::vec3 tr1bitan(1);
     TBNcalculation(tr1edge1, tr1edge2, tr1deltaUV1, tr1deltaUV2, tr1tan, tr1bitan);
@@ -735,7 +761,7 @@ vector<vector<glm::vec3>> terrainVertexCalculation(float *vertices, vector<vecto
     glm::vec3 tr2edge2 = vtx3pos - vtx4pos;
     glm::vec2 tr2deltaUV1 = vtx2nmmap - vtx4nmmap;
     glm::vec2 tr2deltaUV2 = vtx3nmmap - vtx4nmmap;
-    glm::vec3 tr2nm = crossProduct(tr2edge1, tr2edge2);
+    glm::vec3 tr2nm = glm::cross(tr2edge1, tr2edge2);
     glm::vec3 tr2tan(1);
     glm::vec3 tr2bitan(1);
     TBNcalculation(tr2edge1, tr2edge2, tr2deltaUV1, tr2deltaUV2, tr2tan, tr2bitan);
@@ -761,43 +787,35 @@ vector<vector<glm::vec3>> terrainVertexCalculation(float *vertices, vector<vecto
 
 void nmSum(vector<vector<glm::vec3>> nmArray) {
   for (int i = 1; i < nmArray.size() ; i++) {
-    for (int j = 1; j < nmArray[0].size() - 1; j++) {
-      glm::vec3 nm = glm::normalize(nmArray[i - 1][j - 1] + nmArray[i - 1][j] + nmArray[i - 1][j + 1] + nmArray[i][j - 1] + nmArray[i][j] + nmArray[i][j + 1]);
+    for (int j = 1; j < nmArray[0].size() / 2; j++) {
+      glm::vec3 nm = glm::normalize(nmArray[i - 1][2 * j - 1] + nmArray[i - 1][ 2 * j] + nmArray[i - 1][2 * j + 1] + nmArray[i][2 * j - 2] + nmArray[i][2 * j - 1] + nmArray[i][2 * j]);
       // i-1 j-1
-      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j - 1) + 2 * itemNums + 3] = nm.x;
-      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j - 1) + 2 * itemNums + 4] = nm.y;
-      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j - 1) + 2 * itemNums + 5] = nm.z;
+      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (2 * j - 1) + 2 * itemNums + 3] = nm.x;
+      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (2 * j - 1) + 2 * itemNums + 4] = nm.y;
+      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (2 * j - 1) + 2 * itemNums + 5] = nm.z;
       // i-1 j
-      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * j + 2 * itemNums + 3] = nm.x;
-      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * j + 2 * itemNums + 4] = nm.y;
-      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * j + 2 * itemNums + 5] = nm.z;
+      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (2 * j) + 2 * itemNums + 3] = nm.x;
+      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (2 * j) + 2 * itemNums + 4] = nm.y;
+      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (2 * j) + 2 * itemNums + 5] = nm.z;
       // i-1 j+1
-      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j + 1) + 1 * itemNums + 3] = nm.x;
-      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j + 1) + 1 * itemNums + 4] = nm.y;
-      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j + 1) + 1 * itemNums + 5] = nm.z;
+      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (2 * j + 1) + 1 * itemNums + 3] = nm.x;
+      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (2 * j + 1) + 1 * itemNums + 4] = nm.y;
+      vertices[(i - 1) * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (2 * j + 1) + 1 * itemNums + 5] = nm.z;
       // i j-1
-      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j - 1) + 1 * itemNums + 3] = nm.x;
-      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j - 1) + 1 * itemNums + 4] = nm.y;
-      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j - 1) + 1 * itemNums + 5] = nm.z;
+      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (2 * j - 1) + 1 * itemNums + 3] = nm.x;
+      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (2 * j - 1) + 1 * itemNums + 4] = nm.y;
+      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (2 * j - 1) + 1 * itemNums + 5] = nm.z;
       // i j
-      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * j + 3] = nm.x;
-      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * j + 4] = nm.y;
-      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * j + 5] = nm.z;
+      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * 2 * j + 3] = nm.x;
+      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * 2 * j + 4] = nm.y;
+      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * 2 * j + 5] = nm.z;
       // i j+1
-      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j + 1) + 3] = nm.x;
-      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j + 1) + 4] = nm.y;
-      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (j + 1) + 5] = nm.z;
+      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (2 * j + 1) + 3] = nm.x;
+      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (2 * j + 1) + 4] = nm.y;
+      vertices[i * itemNums * nmArray[0].size() * 3 + 3 * itemNums * (2 * j + 1) + 5] = nm.z;
     }
   }
 }
-
-//vector<glm::vec3> normalCalculation(glm::vec3 nm1, glm::vec3 nm2, glm::vec3 nm3, glm::vec3 nm4, glm::vec3 nm5, glm::vec3 nm6, int row, int col) {
-//  vector<glm::vec3> verticeNm;
-//  for (int i = col * itemNums, j = 1, k = 0; i < size * 6 * itemNums - map[0].size() * 6 * itemNums; i += itemNums) {
-//
-//  }
-//}
-
 
 
 void TBNcalculation(glm::vec3 edge1, glm::vec3 edge2, glm::vec2 deltaUV1, glm::vec2 deltaUV2, glm::vec3 &tan, glm::vec3 &bitan) {
@@ -844,7 +862,7 @@ void renderModel(Shader &shader1, Model &ourModel) {
 void renderCube(Shader &shader1) {
 	shader1.use();
 	
-	model = glm::translate(model, glm::vec3(41.0f, -2.0f, 41.0f));
+	model = glm::translate(model, glm::vec3(41.0f, 0.0f, 41.0f));
 	model = glm::rotate(model, 45.0f, glm::vec3(1.0, 1.0, 0.0));
 	model = glm::scale(model, glm::vec3(2.0f, 2.0f, 2.0f));
 	
@@ -858,11 +876,8 @@ void renderCube(Shader &shader1) {
 }
 
 void DepthMap(Shader &shader1, Model &ourModel) {
-	model = glm::scale(model, glm::vec3(100.0f, 100.0f, 100.0f));
-	model = glm::rotate(model, 90.0f, glm::vec3(1.0, 0.0, 0.0));
-
-	GLfloat near_plane =1.0f, far_plane = 100.0f;
-  	glm::mat4 lightProjection = glm::perspective(45.0f, (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.01f, 500.0f);
+  GLfloat near_plane = 0.0f, far_plane = 100.0f;
+  glm::mat4 lightProjection = glm::ortho(-100.0f, 100.0f, -100.0f, 100.0f, near_plane, far_plane);
     glm::mat4 lightView = glm::lookAt(
       lightPos,
       glm::vec3(48.0f, 0.0f, 40.0f),
@@ -955,70 +970,3 @@ void RenderText(Shader &shader, string text, GLfloat x, GLfloat y, GLfloat scale
 	glBindVertexArray(0);
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
-
-
-/*
-// calculate
-glm::vec3 v0 = glm::vec3{ (float)j / (float)map[0].size(), (float)k / (float)map.size(), (float)map[j][k] / 256.0f / 8 };
-glm::vec3 v1;
-glm::vec3 v2;
-glm::vec3 v3;
-glm::vec3 v4;
-glm::vec3 a;
-glm::vec3 b;
-
-//v0v1v2
-glm::vec3 n1 = glm::vec3{ 0.0f,0.0f,0.0f };
-if (k - 1 < 0 || j - 1 < 0) {
-n1 = glm::vec3{ 0.0f,0.0f,0.0f };
-}
-else {
-v1 = glm::vec3{ (float)j / (float)map[0].size(), (float)(k - 1) / (float)map.size(), (float)map[j][k - 1] / 256.0f / 8 };
-v2 = glm::vec3{ (float)(j - 1) / (float)map[0].size(), (float)k / (float)map.size(), (float)map[j - 1][k] / 256.0f / 8 };
-a = v1 - v0;
-b = v2 - v0;
-n1 = crossProduct(a, b);
-}
-
-//v0v2v3
-glm::vec3 n2 = glm::vec3{ 0.0f,0.0f,0.0f };
-if (k + 1 > (map.size() - 1) || j - 1 < 0) {
-n2 = glm::vec3{ 0.0f,0.0f,0.0f };
-}
-else {
-v3 = glm::vec3{ (float)j / (float)map[0].size(), (float)(k + 1) / (float)map.size(), (float)map[j][k + 1] / 256.0f / 8 };
-a = v2 - v0;
-b = v3 - v0;
-n2 = crossProduct(a, b);
-}
-
-//v0v3v4
-glm::vec3 n3 = glm::vec3{ 0.0f,0.0f,0.0f };
-if (k + 1 > (map.size() - 1) || j + 1 > (map[0].size() - 1)) {
-n3 = glm::vec3{ 0.0f,0.0f,0.0f };
-}
-else {
-v4 = glm::vec3{ (float)(j + 1) / (float)map[0].size(), (float)k / (float)map.size(), (float)map[j + 1][k] / 256.0f / 8 };
-a = v3 - v0;
-b = v4 - v0;
-n3 = crossProduct(a, b);
-}
-
-//v0v4v1
-glm::vec3 n4 = glm::vec3{ 0.0f,0.0f,0.0f };
-if (k - 1 < 0 || j + 1 > (map[0].size() - 1)) {
-n4 = glm::vec3{ 0.0f,0.0f,0.0f };
-}
-else {
-a = v4 - v0;
-b = v1 - v0;
-n4 = crossProduct(a, b);
-}
-
-//
-glm::vec3 Nor = n1 + n2 + n3 + n4;
-
-vertices[i + 3] = Nor.x;
-vertices[i + 4] = Nor.y;
-vertices[i + 5] = Nor.z;
-*/

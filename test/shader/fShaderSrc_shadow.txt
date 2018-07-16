@@ -57,7 +57,7 @@ void main()
 
 	float bias =0.005;
 	float shadow = ShadowCalculation(posInLSpace, bias);
-    FragColor = vec4(ambient+ (1.0 - shadow) * (diffuse + specular) , 1.0f) * objectColor;
+     FragColor = vec4(ambient+ (1.0 - shadow) * (diffuse + specular) , 1.0f) * objectColor;
 	// FragColor = vec4(normal.xyz, 1.0);
 	// float gamma = 2.2;
     // FragColor.rgb = pow(FragColor.rgb, vec3(1.0/gamma));
